@@ -1,0 +1,440 @@
+{
+  "character_key": "han-lang-phong",
+  "name": "Hàn Lăng Phong (Han Lingfeng)",
+  "title": "Phong Lôi Kiếm Tử",
+  "gender": "male",
+  "age": "young adult (20-22)",
+  "project_id": "09c32739-99ca-4d85-a250-558faf36d638",
+  "project_name": "Hàn Lăng Phong",
+  "flow_project_url": "https://flow.google.com/project/09c32739-99ca-4d85-a250-558faf36d638",
+  "profile": {
+    "personality": "Lãnh tĩnh kiên nghị, tiêu sái phong khoáng, kiếm ý lăng lệ",
+    "combat_style": "Phong lôi quyền pháp, kiếm khí chỉ pháp, tay không linh lực",
+    "hair": "Tóc đen tuyền dày mượt buộc đuôi ngựa cao với khoen bạc, lọn tóc mái tỉa layer nhẹ trước trán, hai lọn tóc mai buông rủ ôm nhẹ gò má, đuôi tóc buông dài ngang lưng",
+    "skin": "Fair warm ivory natural healthy skin tone, đồng nhất hoàn toàn giữa mặt, cổ và hai bàn tay",
+    "outfit": "Trường bào tiên hiệp huyền lôi 2 tầng: tầng trong lụa trắng sương mai giao lĩnh, tầng ngoài lụa sa màu xanh chàm thẫm viền chỉ bạc lôi vân tinh tế; tà áo xẻ đôi rủ thẳng tự nhiên xuôi theo trọng lực; chiến ủng vải đế bằng đế thấp tuyệt đối (strictly flat cloth martial boots, zero heels)",
+    "primary_color": "Deep Midnight Indigo & Frost White",
+    "accent_color": "Slate Teal & Celestial Silver",
+    "style": "2D Xianxia/Fantasy manhwa anime chibi sprite, bold clean linework, flat cel-shaded coloring, mature 4.8-5.0 heads ratio",
+    "chroma_bg": "#00FF00"
+  },
+  "angle_0": {
+    "media_id": "8bcd85e1-4c37-4f58-a92d-0546aabc19e4",
+    "file": "angle_0.png",
+    "size_bytes": 125005,
+    "status": "COMPLETED",
+    "description": "Root Identity (Candidate 1) - Chuẩn Manhwa Nam Mặt Mộc Đồng Nhất"
+  },
+  "angle_45": {
+    "media_id": "e44acb30-e69a-4a25-83e3-76950582f18f",
+    "file": "angle_45.png",
+    "size_bytes": 123871,
+    "status": "COMPLETED",
+    "description": "Dual-Ref Mannequin Nam 45° (Candidate 1 - 3/4 Front-Left)"
+  },
+  "angle_90": {
+    "media_id": "921cbaf2-26eb-482e-9a22-0418dafd51e1",
+    "file": "angle_90.png",
+    "size_bytes": 97472,
+    "status": "COMPLETED",
+    "description": "Dual-Ref Mannequin Nam 90° (Candidate 1 - Pure Left Side Profile)"
+  },
+  "angle_135": {
+    "media_id": "8d968c8d-503e-448a-91dc-54e9977bea67",
+    "file": "angle_135.png",
+    "size_bytes": 108728,
+    "status": "COMPLETED",
+    "description": "Dual-Ref Mannequin Nam 135° (Candidate 1 - Khớp 100% tỷ lệ 5 đầu, mặt mộc phẳng, đai phẳng)"
+  },
+  "angle_180": {
+    "media_id": "5ff23040-e0ff-4ab9-815b-b8b4a8a53f23",
+    "file": "angle_180.png",
+    "size_bytes": 102586,
+    "status": "COMPLETED",
+    "description": "Dual-Ref Mannequin Nam 180° (Candidate 3 - Tỷ lệ chuẩn 5 đầu khớp 100% với angle 0°, đai phẳng trơn)"
+  },
+  "actions": {
+    "dung-yen": {
+      "angle_90": {
+        "media_id": "c10fc4d7-40a3-495d-a8ba-5dc04e3b3830",
+        "file": "dung-yen/idle_90.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1571167,
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "96c885b3-f919-4d92-a321-b255a6c384d6",
+        "file": "dung-yen/idle_45.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1831094,
+        "status": "COMPLETED"
+      },
+      "angle_0": {
+        "media_id": "",
+        "file": "dung-yen/idle_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1689058,
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "",
+        "file": "dung-yen/idle_135.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1954839,
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "",
+        "file": "dung-yen/idle_180.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1657185,
+        "status": "COMPLETED"
+      }
+    },
+    "di-bo": {
+      "angle_180": {
+        "media_id": "8a840261-5a91-46aa-a3b7-2f49040719c4",
+        "file": "di-bo/walk_180.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1473628,
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "d8ab32e9-47a5-4ea8-b229-5e0fa1dfb423",
+        "file": "di-bo/walk_90.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1397142,
+        "status": "COMPLETED"
+      },
+      "angle_0": {
+        "media_id": "",
+        "file": "di-bo/walk_0.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1845205,
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "",
+        "file": "di-bo/walk_45.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1515926,
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "",
+        "file": "di-bo/walk_135.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1694271,
+        "status": "COMPLETED"
+      }
+    },
+    "chay": {
+      "angle_180": {
+        "media_id": "d4170065-446e-43f4-9344-b385b12e381b",
+        "file": "chay/run_180.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1786001,
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "e1f2ec75-b297-414f-940c-f5d720f6821f",
+        "file": "chay/run_45.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2332386,
+        "status": "COMPLETED"
+      },
+      "angle_0": {
+        "media_id": "",
+        "file": "chay/run_0.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2225822,
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "",
+        "file": "chay/run_90.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2217138,
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "",
+        "file": "chay/run_135.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2276188,
+        "status": "COMPLETED"
+      }
+    },
+    "vay-tay": {
+      "angle_180": {
+        "media_id": "7d846d61-1577-440c-befe-3b17c3a43820",
+        "file": "vay-tay/wave_180.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1526532,
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "",
+        "file": "vay-tay/wave_45.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1562909,
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "",
+        "file": "vay-tay/wave_90.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1689729,
+        "status": "COMPLETED"
+      },
+      "angle_0": {
+        "media_id": "3072f415-01c8-4a97-9ab7-d4909427d427",
+        "file": "vay-tay/wave_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1464077,
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "cd68acde-6d6e-4b28-b399-e8415aff7e44",
+        "file": "vay-tay/wave_135.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2025290,
+        "status": "COMPLETED"
+      }
+    },
+    "hanh-le": {
+      "angle_90": {
+        "media_id": "",
+        "file": "hanh-le/bow_90.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1840404,
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "",
+        "file": "hanh-le/bow_135.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2145244,
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "118046ff-cf64-4b00-904b-54c7e7f44ca5",
+        "file": "hanh-le/bow_180.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1835370,
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "8e228095-b137-4c1b-b269-e841313b4371",
+        "file": "hanh-le/bow_45.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2145000,
+        "status": "COMPLETED"
+      }
+    },
+    "che-mieng-cuoi": {
+      "angle_90": {
+        "media_id": "04876da8-f309-4883-9159-1da344476954",
+        "file": "che-mieng-cuoi/cover_mouth_laugh_90.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1402732,
+        "status": "COMPLETED"
+      },
+      "angle_0": {
+        "media_id": "",
+        "file": "che-mieng-cuoi/cover_mouth_laugh_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1612189,
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "0c6b8065-61bc-49c5-b1d8-33b22d8f2159",
+        "file": "che-mieng-cuoi/cover_mouth_laugh_45.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1730051,
+        "status": "COMPLETED"
+      }
+    },
+    "noi-chuyen": {
+      "angle_135": {
+        "media_id": "07db28e6-87a0-406c-9797-ceb9c40d876e",
+        "file": "noi-chuyen/talking_135.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2082408,
+        "status": "COMPLETED"
+      },
+      "angle_0": {
+        "media_id": "",
+        "file": "noi-chuyen/talking_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1725517,
+        "status": "COMPLETED"
+      }
+    },
+    "gat-dau": {
+      "angle_0": {
+        "media_id": "9a27af8c-e32d-4905-97a0-2e07cd2385f9",
+        "file": "gat-dau/nod_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2047751,
+        "status": "COMPLETED"
+      }
+    },
+    "suy-nghi": {},
+    "kinh-ngac": {},
+    "reo-ho": {
+      "angle_135": {
+        "media_id": "922aa121-478e-411d-b9f1-4117e6576ef3",
+        "file": "reo-ho/cheer_135.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2185063,
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "",
+        "file": "reo-ho/cheer_45.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1693957,
+        "status": "COMPLETED"
+      }
+    },
+    "buon-ba": {
+      "angle_90": {
+        "media_id": "10276f7d-dc88-4ae1-9000-a50fb58164ee",
+        "file": "buon-ba/sad_90.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1611006,
+        "status": "COMPLETED"
+      },
+      "angle_0": {
+        "media_id": "6c2b31c0-6dc3-44ca-867f-ce74a61a68fa",
+        "file": "buon-ba/sad_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1845164,
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "",
+        "file": "buon-ba/sad_135.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1818846,
+        "status": "COMPLETED"
+      }
+    },
+    "tuc-gian": {
+      "angle_0": {
+        "media_id": "aed4c52b-3e65-416f-9417-e6e097894b1f",
+        "file": "tuc-gian/angry_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2254173,
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "7c55dbe4-7455-4a36-b4d7-51940949c3b9",
+        "file": "tuc-gian/angry_45.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2055558,
+        "status": "COMPLETED"
+      }
+    },
+    "danh-cong": {
+      "angle_0": {
+        "media_id": "dc72c7cd-9fb3-45f3-b030-34990e74cbd9",
+        "file": "danh-cong/attack_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 3543485,
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "e9c99d0c-a367-4e3c-8171-0193911b40b2",
+        "file": "danh-cong/attack_90.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2540576,
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "4b4a1c84-132b-44f8-9ae6-ffe42b2e6585",
+        "file": "danh-cong/attack_180.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2707040,
+        "status": "COMPLETED"
+      }
+    },
+    "phong-thu": {
+      "angle_45": {
+        "media_id": "",
+        "file": "phong-thu/defend_45.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1802032,
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "",
+        "file": "phong-thu/defend_135.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 1972753,
+        "status": "COMPLETED"
+      }
+    },
+    "trung-don": {
+      "angle_45": {
+        "media_id": "259250e7-e8e3-435f-b763-8740568bd141",
+        "file": "trung-don/hurt_45.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2756689,
+        "status": "COMPLETED"
+      },
+      "angle_0": {
+        "media_id": "",
+        "file": "trung-don/hurt_0.mp4",
+        "duration": 8.0,
+        "resolution": "720x1280",
+        "size_bytes": 2088965,
+        "status": "COMPLETED"
+      }
+    }
+  }
+}

@@ -1,0 +1,103 @@
+import urllib.request, json, sys, os
+
+sys.stdout.reconfigure(encoding='utf-8')
+
+PROJECT_ID = "698fe101-ecbe-4102-8474-e27c1d350643"
+OUTPUT_DIR = r"e:\UngDung_PC\Flow-App\AI-Render-Video\agent-veo3\output\van-hi"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+PROMPT_0 = (
+    "MASTER CHARACTER DESIGN — 2D XIANXIA CHIBI — 0° DIRECT FRONT VIEW.\n"
+    "CAMERA & POSE: Full body standing centered, facing 100% directly forward at camera (0° strict front view, 12 o'clock). "
+    "Symmetrical standing pose, torso upright, shoulders level, arms relaxed at sides, empty hands, legs straight.\n"
+    "CRITICAL — BLANK FACELESS HEAD & NATURAL UNIFORM SKIN: Completely BLANK, SMOOTH, FEATURELESS face surface "
+    "(NO eyes, NO eyebrows, NO nose, NO mouth). The facial skin color MUST seamlessly and uniformly match the neck, ears, and hands "
+    "with a fair natural warm peach skin tone. STRICTLY ZERO shiny white porcelain mask, ZERO chalky white enamel face contrast, "
+    "ZERO face-neck tone discrepancy. Pure continuous natural flesh tone across head and neck.\n"
+    "CRITICAL — ZERO WEAPONS OR PROPS: The character carries NO weapons, NO swords on back or waist, NO musical instruments, "
+    "NO props. Both hands are empty and resting naturally.\n"
+    "CHARACTER: Vân Hi (Yun Xi) — Linh Nguyệt Tiên Cơ, young female immortal maiden (19-20 years old appearance), "
+    "slender graceful ethereal physique (166cm, 46kg), pure elegant fairy demeanor.\n"
+    "HAIRSTYLE: Long silky flowing raven-black hair tied into an elegant half-up bun with a delicate carved silver lotus hairpin "
+    "and twin flowing pale azure silk ribbons.\n"
+    "COSTUME DETAILS:\n"
+    "- Elegant moonlit-white flowing daoist silk robes with wide layered pagoda sleeves.\n"
+    "- Layered translucent soft mist-blue overskirt with delicate silver edge embroidery.\n"
+    "- Soft celadon silk waist sash tied in an elegant bow with a small pale celadon jade pendant.\n"
+    "- SHOES: Soft ivory embroidered lotus cloth shoes with flat grounded soles (CRITICAL: STRICTLY FLAT, ZERO HEELS, NO HIGH HEELS).\n"
+    "LIGHTING & COLOR PALETTE: Harmonious natural pastel palette, clean flat cel-shaded anime shading, bold clean linework. "
+    "STRICTLY ZERO neon lighting, ZERO harsh glowing rim lights, ZERO glowing neon edge reflections.\n"
+    "BACKGROUND: Solid chroma-key green #00FF00. Centered, full body visible from head to feet."
+)
+
+print("🚀 Bắt đầu sinh ảnh 0° (Master Root) cho Vân Hi...")
+print("Project ID:", PROJECT_ID)
+
+req = urllib.request.Request(
+    "http://127.0.0.1:8100/api/flow/generate-image",
+    data=json.dumps({
+        "prompt": PROMPT_0,
+        "project_id": PROJECT_ID,
+        "aspect_ratio": "IMAGE_ASPECT_RATIO_PORTRAIT",
+        "user_paygate_tier": "PAYGATE_TIER_TWO"
+    }).encode("utf-8"),
+    headers={"Content-Type": "application/json", "Accept": "application/json"}
+)
+
+try:
+    with urllib.request.urlopen(req, timeout=120) as res:
+        res_data = json.loads(res.read())
+        media_list = res_data.get("media", [])
+        if not media_list:
+            print("Raw response:", json.dumps(res_data, indent=2))
+            sys.exit(1)
+            
+        m = media_list[0]
+        media_id = m.get("name")
+        print("✅ Media ID:", media_id)
+        
+        gen_img = m.get("image", {}).get("generatedImage", {})
+        img_url = (
+            m.get("fifeUrl")
+            or m.get("servingUri")
+            or gen_img.get("fifeUrl")
+            or gen_img.get("servingUri")
+            or m.get("image", {}).get("fifeUrl")
+            or m.get("image", {}).get("servingUri")
+        )
+            
+        print("Image URL:", img_url)
+        
+        target_path = os.path.join(OUTPUT_DIR, "angle_0.png")
+        if img_url:
+            print("Tải ảnh về", target_path)
+            urllib.request.urlretrieve(img_url, target_path)
+            print("✅ Đã lưu angle_0.png! Size:", os.path.getsize(target_path))
+        elif "image" in m and "encodedImage" in m["image"]:
+            import base64
+            with open(target_path, "wb") as f:
+                f.write(base64.b64decode(m["image"]["encodedImage"]))
+            print("✅ Đã lưu angle_0.png từ base64! Size:", os.path.getsize(target_path))
+        else:
+            print("⚠️ Không tìm thấy URL hay base64 trong media:", m)
+            
+        meta = {
+            "character_key": "van-hi",
+            "project_id": PROJECT_ID,
+            "project_name": "Linh Nguyệt Tiên Cơ - Vân Hi",
+            "angle_0": {
+                "media_id": media_id,
+                "file": "angle_0.png",
+                "image_url": img_url,
+                "status": "COMPLETED"
+            }
+        }
+        with open(os.path.join(OUTPUT_DIR, "character_meta.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+        print("Đã lưu character_meta.json")
+
+except Exception as e:
+    print("Error:", e)
+    if hasattr(e, "read"):
+        print("Error details:", e.read().decode("utf-8", errors="replace"))
+    sys.exit(1)

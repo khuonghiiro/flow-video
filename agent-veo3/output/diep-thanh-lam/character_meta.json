@@ -1,0 +1,352 @@
+{
+  "character_key": "diep-thanh-lam",
+  "name": "Diệp Thanh Lam (Ye Qinglan)",
+  "title": "Băng Lam Tiên Tử",
+  "gender": "female",
+  "age": "young adult (18-20)",
+  "project_id": "7c7b4d45-2416-4902-b77a-1601a0aecff9",
+  "project_name": "Diep Thanh Lam",
+  "flow_project_url": "https://flow.google.com/project/7c7b4d45-2416-4902-b77a-1601a0aecff9",
+  "profile": {
+    "personality": "Thanh nhã thoát tục, ôn nhu nội liễm, băng cơ ngọc cốt, tiên khí thuần khiết",
+    "combat_style": "Băng lam kiếm vũ, hư không điểm chỉ, tay không linh lực",
+    "hair": "Tóc đen tuyền dài mượt buông qua eo, búi đôi kiểu tiên khí hồ điệp đính trâm hoa lưu ly băng lam và trâm bạc, hai lọn tóc mai mềm mại buông rủ ôm nhẹ gò má thanh tú",
+    "skin": "Fair warm ivory natural jade skin tone, đồng nhất hoàn toàn giữa mặt, cổ và hai bàn tay",
+    "outfit": "Trường bào lụa tiên môn nữ 2 tầng: tầng trong lụa trắng tuyết giao lĩnh, tầng ngoài lụa sa mỏng màu xanh ngọc băng lam viền chỉ bạc và hoa văn tinh xảo; tà váy nhiều lớp rủ thẳng tự nhiên xuôi theo trọng lực; chiến ủng/hài vải thêu hoa sen đế bằng tuyệt đối (flat cloth lotus shoes, zero heels)",
+    "primary_color": "Pure Snow White & Pale Icy Azure",
+    "accent_color": "Soft Celestial Silver & Mist Cyan",
+    "style": "2D Xianxia/Fantasy manhwa anime chibi sprite, bold clean linework, flat cel-shaded coloring, mature 4.8-5.0 heads ratio",
+    "chroma_bg": "#00FF00"
+  },
+  "angle_0": {
+    "media_id": "973a46d8-4d96-4657-aea8-ec7861080166",
+    "file": "angle_0.png",
+    "size_bytes": 148154,
+    "status": "COMPLETED",
+    "description": "Root Identity (Candidate 0) - Chuẩn Manhwa Nữ Mặt Mộc Đồng Nhất"
+  },
+  "angle_45": {
+    "media_id": "941eff2c-e453-4c20-a9f4-4d35ecba78f9",
+    "file": "angle_45.png",
+    "size_bytes": 140849,
+    "status": "COMPLETED",
+    "description": "Dual-Ref Mannequin Nữ 45° (3/4 Front-Left)"
+  },
+  "angle_90": {
+    "media_id": "ce1c46ec-2051-4049-af53-29e338b59a42",
+    "file": "angle_90.png",
+    "size_bytes": 111523,
+    "status": "COMPLETED",
+    "description": "Dual-Ref Mannequin Nữ 90° (True Pure Side Profile)"
+  },
+  "angle_135": {
+    "media_id": "3ffa0744-297e-4c5f-96be-2aee38ae7d8c",
+    "file": "angle_135.png",
+    "size_bytes": 128637,
+    "status": "COMPLETED",
+    "description": "Dual-Ref Mannequin Nữ 135° (Thân xoay 8h, nơ rủ phẳng lệch 45°)"
+  },
+  "angle_180": {
+    "media_id": "636a69fb-00ea-4e42-b488-0fa7e9f6d44d",
+    "file": "angle_180.png",
+    "size_bytes": 132902,
+    "status": "COMPLETED",
+    "description": "Dual-Ref Mannequin Nữ 180° (Symmetrical Rear View)"
+  },
+  "actions": {
+    "dung-yen": {
+      "label": "Đứng Yên",
+      "action_key": "idle",
+      "angle_0": {
+        "media_id": "a605fef8-8cfc-4ebf-8701-4ba120e66d7e",
+        "file": "dung-yen/idle_0.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1028077,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "f354384a-563f-4808-a06f-d61a624efd9a",
+        "file": "dung-yen/idle_45.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 944215,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "8819674d-10ed-4371-ae0a-74ff2fe9524e",
+        "file": "dung-yen/idle_90.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 927797,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "666d1700-ff30-456e-aeb6-e0bb6b4560f7",
+        "file": "dung-yen/idle_135.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 803131,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "dea10d52-8055-47c6-a5b9-7db305e4f2ab",
+        "file": "dung-yen/idle_180.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1135639,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      }
+    },
+    "di-bo": {
+      "label": "Đi Bộ",
+      "action_key": "walk",
+      "angle_0": {
+        "media_id": "1aaa6e1b-12cb-4a4a-a544-74bf62a30139",
+        "file": "di-bo/walk_0.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 3541073,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "d6db6716-34e9-4a06-9220-2adaa01a0c6c",
+        "file": "di-bo/walk_45.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1640754,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "ecd1f189-113c-45b3-bb66-d2f7ac6e3179",
+        "file": "di-bo/walk_90.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 3159933,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "a798bd89-94ea-4f7f-a831-b6597c28838e",
+        "file": "di-bo/walk_135.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1627652,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "3af7ceef-bfe9-4b00-a217-bd59ddea2130",
+        "file": "di-bo/walk_180.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 3014607,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      }
+    },
+    "chay": {
+      "label": "Chạy",
+      "action_key": "run",
+      "angle_0": {
+        "media_id": "fca94866-3d76-4f13-906e-825fd921f453",
+        "file": "chay/run_0.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 5182045,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "ed5a260b-f956-4bcc-a4fa-6f7b013cb42d",
+        "file": "chay/run_45.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2574894,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "b27cc60f-b0f0-47ec-8158-5ef728277ca8",
+        "file": "chay/run_90.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 4638743,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "d4dcfeef-d95c-4323-8c9c-67a07b8302f2",
+        "file": "chay/run_135.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2357226,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "e83fc682-eb82-4623-bc84-8bb477a81912",
+        "file": "chay/run_180.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 4451146,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      }
+    },
+    "vay-tay": {
+      "label": "Vẫy Tay Chào",
+      "action_key": "wave",
+      "angle_0": {
+        "media_id": "db6ac099-a085-463a-943f-48bf3152be39",
+        "file": "vay-tay/wave_0.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1277072,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "2f30cbf5-4abb-4445-b0e7-3097352f447b",
+        "file": "vay-tay/wave_45.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1820214,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "53b266d6-0f09-4f10-8ab6-cf17215e94c3",
+        "file": "vay-tay/wave_90.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1175122,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "60b66506-b881-4d52-b87a-5e984bbd0935",
+        "file": "vay-tay/wave_135.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1454748,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "cf33c95b-aef3-46ac-860f-ac550fb39745",
+        "file": "vay-tay/wave_180.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1641696,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      }
+    },
+    "hanh-le": {
+      "label": "Hành Lễ Cúi Chào",
+      "action_key": "bow",
+      "angle_0": {
+        "media_id": "e5ff8dd5-b425-481d-b19d-a0b5a3a7a4ef",
+        "file": "hanh-le/bow_0.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2192729,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "c17751ca-bd76-4dcf-8efc-37989e4c7000",
+        "file": "hanh-le/bow_45.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2269790,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "c76b28f2-5da3-4e18-869e-3cd441ab4f3f",
+        "file": "hanh-le/bow_90.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2261793,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "141da072-6e22-4eb8-ba94-ab833d55e1ee",
+        "file": "hanh-le/bow_135.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2373425,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "50ab240f-7958-458c-a341-357c0e336d0b",
+        "file": "hanh-le/bow_180.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2447510,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      }
+    },
+    "danh-cong": {
+      "label": "Đánh Công",
+      "action_key": "attack",
+      "angle_0": {
+        "media_id": "0450cd90-a8c2-420d-8ff8-ed512270751e",
+        "file": "danh-cong/attack_0.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2107231,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_45": {
+        "media_id": "20ca5c92-e0f7-40c1-9290-a6a778b639ce",
+        "file": "danh-cong/attack_45.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 2923035,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_90": {
+        "media_id": "8fdb09b7-df23-41b9-bba4-ea31b014aad4",
+        "file": "danh-cong/attack_90.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1663929,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_135": {
+        "media_id": "ac3c707e-fc0c-4f53-bce3-2d58addf294c",
+        "file": "danh-cong/attack_135.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 4063562,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      },
+      "angle_180": {
+        "media_id": "6fa3cf32-97c7-4359-961a-26dd8480fafd",
+        "file": "danh-cong/attack_180.mp4",
+        "duration": 4.0,
+        "resolution": "720x1280",
+        "size_bytes": 1723894,
+        "loop_type": "seamless_i2v_fl_4s",
+        "status": "COMPLETED"
+      }
+    }
+  }
+}
