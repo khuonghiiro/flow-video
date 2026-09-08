@@ -137,6 +137,65 @@ def patch_flow_client():
 
         orig_generate_video = FlowClient.generate_video
 
+        RPC_GEN_INTERPOLATION = "nprQif"
+        INTERPOLATION_MODELS = {
+            "veo_3_1_interpolation_lite_low_priority",
+            "veo_3_1_interpolation_lite",
+            "veo_3_1_interpolation_fast_ultra",
+        }
+
+        def resolve_interp_model(key: Any) -> str:
+            if isinstance(key, str):
+                if key in INTERPOLATION_MODELS:
+                    return key
+                if "ultra" in key:
+                    return "veo_3_1_interpolation_fast_ultra"
+                if "low_priority" in key:
+                    return "veo_3_1_interpolation_lite_low_priority"
+                if "lite" in key:
+                    return "veo_3_1_interpolation_lite"
+            return "veo_3_1_interpolation_lite_low_priority"
+
+        def build_interpolation_request(
+            prompt: str,
+            project_id: str,
+            start_image_media_id: str,
+            end_image_media_id: str,
+            crop: Optional[list] = None,
+            aspect: Any = None,
+            model: str = "veo_3_1_interpolation_lite_low_priority",
+        ) -> str:
+            crop_val = [None, None, 1, 1] if crop is None else crop
+            asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
+            inner = [
+                [[[None, None, [[[prompt]]]],
+                  resolve_interp_model(model),
+                  asp_val,
+                  None,
+                  [None, start_image_media_id, None, None, None, crop_val],
+                  [None, end_image_media_id, None, None, None, crop_val],
+                  [None, None, None, None, fb._client_uuid(), fb._client_uuid()]]],
+                fb._context(project_id),
+                [fb._client_uuid(), 1],
+            ]
+            return fb.build_envelope(RPC_GEN_INTERPOLATION, inner)
+
+        def extract_interpolation_media_id(payload: Any) -> Optional[str]:
+            try:
+                if isinstance(payload, list) and len(payload) > 3 and isinstance(payload[3], list):
+                    for row in payload[3]:
+                        if isinstance(row, list) and len(row) > 0 and isinstance(row[0], str) and len(row[0]) == 36:
+                            return row[0]
+                if isinstance(payload, list) and len(payload) > 2 and isinstance(payload[2], list):
+                    rec = payload[2][0]
+                    if isinstance(rec, list) and len(rec) > 3 and isinstance(rec[3], list) and len(rec[3]) > 4:
+                        mid = rec[3][4]
+                        if isinstance(mid, str) and len(mid) == 36:
+                            return mid
+            except Exception:
+                pass
+            return None
+
         async def enhanced_generate_video(
             self,
             start_image_media_id: str,
@@ -157,38 +216,53 @@ def patch_flow_client():
 
             # ─── Flow batchexecute transport (Current path on flow.google.com) ───
             if USE_BATCH_RPC:
+                crop_list = get_batch_crop_list(aspect_ratio, crop_coordinates) if crop_coordinates else [None, None, 1, 1]
+                pid = self._batch_project_id(project_id)
+
                 if end_image_media_id:
-                    if not FLOW_ALLOW_DEGRADED:
-                        return {"error": _unsupported(
-                            "start+end frame chaining",
-                            "the new payload's end-image slot was never captured",
-                        )}
-                    logger.warning(
-                        "Scene %s: dropping end frame %s — chaining is not on the batch path, "
-                        "running plain i2v because FLOW_ALLOW_DEGRADED=1",
-                        str(scene_id)[:12], end_image_media_id[:12],
+                    batch_model = resolve_interp_model(
+                        "veo_3_1_interpolation_lite_low_priority" if "low_priority" in str(user_paygate_tier).lower()
+                        else "veo_3_1_interpolation_lite"
                     )
-
-                batch_model = self._batch_video_model(user_paygate_tier, gen_type, aspect_ratio)
-                crop_list = get_batch_crop_list(aspect_ratio, crop_coordinates)
-
-                logger.info(
-                    "[VEO3 BATCH DISPATCH] gen_type=%s model=%s aspect=%s duration=%s end_frame=%s",
-                    gen_type, batch_model, aspect_ratio, duration, bool(end_image_media_id)
-                )
-
-                try:
-                    pid = self._batch_project_id(project_id)
-                    freq = fb.video_request(
-                        prompt, pid, start_image_media_id, crop=crop_list, aspect=aspect_ratio,
-                        model=batch_model,
+                    logger.info(
+                        "[VEO3 BATCH INTERPOLATION DISPATCH] model=%s aspect=%s start=%s end=%s",
+                        batch_model, aspect_ratio, start_image_media_id[:12], end_image_media_id[:12]
                     )
-                    payload = await self._batch_payload(
-                        fb.RPC_GEN_VIDEO, freq, fb.CAPTCHA_VIDEO, timeout=120
+                    try:
+                        freq = build_interpolation_request(
+                            prompt, pid, start_image_media_id, end_image_media_id,
+                            crop=crop_list, aspect=aspect_ratio, model=batch_model,
+                        )
+                        payload = await self._batch_payload(
+                            RPC_GEN_INTERPOLATION, freq, fb.CAPTCHA_VIDEO, timeout=120
+                        )
+                        logger.info("[VEO3 NPRQIF RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
+                        operation = fb.read_operation(payload)
+                        mid = extract_interpolation_media_id(payload)
+                        if mid:
+                            self._operation_media[operation.operation_id] = mid
+                    except Exception as e:
+                        return _batch_error(e)
+                else:
+                    batch_model = self._batch_video_model(user_paygate_tier, gen_type, aspect_ratio)
+                    logger.info(
+                        "[VEO3 BATCH DISPATCH] gen_type=%s model=%s aspect=%s duration=%s",
+                        gen_type, batch_model, aspect_ratio, duration
                     )
-                    operation = fb.read_operation(payload)
-                except Exception as e:
-                    return _batch_error(e)
+                    try:
+                        freq = fb.video_request(
+                            prompt, pid, start_image_media_id, crop=crop_list, aspect=aspect_ratio,
+                            model=batch_model,
+                        )
+                        payload = await self._batch_payload(
+                            fb.RPC_GEN_VIDEO, freq, fb.CAPTCHA_VIDEO, timeout=120
+                        )
+                        operation = fb.read_operation(payload)
+                        mid = extract_interpolation_media_id(payload)
+                        if mid:
+                            self._operation_media[operation.operation_id] = mid
+                    except Exception as e:
+                        return _batch_error(e)
 
                 self._remember_operation(operation.operation_id, pid)
                 return {"status": 200, "data": {"operations": [_as_pending_operation(operation.operation_id)]}}

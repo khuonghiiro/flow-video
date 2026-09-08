@@ -81,8 +81,12 @@
     "accepted": [
       "veo_3_1_i2v_lite_low_priority",
       "veo_3_1_i2v_lite",
-      "veo_3_1_i2v_s_fast_ultra"
+      "veo_3_1_i2v_s_fast_ultra",
+      "veo_3_1_interpolation_lite_low_priority",
+      "veo_3_1_interpolation_lite",
+      "veo_3_1_interpolation_fast_ultra"
     ],
-    "default": "veo_3_1_i2v_lite_low_priority"
+    "default": "veo_3_1_i2v_lite_low_priority",
+    "default_interpolation": "veo_3_1_interpolation_lite_low_priority"
   }
 }

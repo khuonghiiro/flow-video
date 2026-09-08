@@ -37,3 +37,8 @@ flow-video/
 3. **Batch Requests**: Always submit through `POST /api/requests/batch`, server enforces 5 concurrent requests & 10s cooldown.
 4. **Code Limits**: Target 150-500 lines per file, strictly under 800-1000 lines max. Methods under 50-80 lines.
 5. **Non-invasive Patching**: Keep `flowkit/` core intact; apply Veo3 features via `agent-veo3/agent/extension_patcher.py`.
+
+## Documentation & References
+
+- [10-Step Video Pipeline Guide](file:///e:/UngDung_PC/flow-video/docs/10_STEP_VIDEO_PIPELINE_GUIDE.md): Cẩm nang quy trình sản xuất video 10 bước chuẩn thực chiến (từ Project -> Ref Images -> Scene Images -> Veo3 Video 4s/6s/8s -> Concat).
+- [Architecture Details](file:///e:/UngDung_PC/flow-video/flowkit/ARCHITECTURE.md): Kiến trúc tổng thể FlowKit và Agent Veo3.

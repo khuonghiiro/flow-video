@@ -375,6 +375,15 @@ async def fetch_blob_endpoint(body: dict):
     return await client._send("fetch_blob", {"url": url}, timeout=60)
 
 
+@flow_veo3_router.post("/reload-extension")
+async def reload_extension_endpoint():
+    """Reload the Chrome extension."""
+    client = get_flow_client()
+    if not client.connected:
+        raise HTTPException(503, "Extension not connected")
+    return await client._send("reload_extension", {}, timeout=10)
+
+
 @flow_veo3_router.post("/exec-tab")
 async def exec_tab_endpoint(body: dict):
     """Execute JS in a Google Flow tab."""
@@ -394,6 +403,16 @@ async def get_captured_video_urls():
     if not client.connected:
         raise HTTPException(503, "Extension not connected")
     res = await client._send("get_captured_video_urls", {}, timeout=10)
+    return res.get("result", []) if isinstance(res, dict) else []
+
+
+@flow_veo3_router.get("/captured-batches")
+async def get_captured_batches():
+    """Get batchexecute payloads captured by extension webRequest."""
+    client = get_flow_client()
+    if not client.connected:
+        raise HTTPException(503, "Extension not connected")
+    res = await client._send("get_captured_batches", {}, timeout=10)
     return res.get("result", []) if isinstance(res, dict) else []
 
 

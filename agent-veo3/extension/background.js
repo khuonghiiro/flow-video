@@ -34,6 +34,7 @@ const _VISIBLE_TYPES = new Set([
 function _classifyRpc(rpcid) {
   if (rpcid === 'ogiZ0b') return 'GEN_IMG';
   if (rpcid === 'eb1hJf') return 'GEN_VID';
+  if (rpcid === 'nprQif') return 'GEN_VID_INTERPOLATE';
   if (rpcid === 'maseQ')  return 'UPLOAD';
   if (rpcid === 'mYWVGd') return 'RENAME';
   if (rpcid === 'jHPbke') return 'CREATE_PROJECT';
@@ -163,6 +164,36 @@ if (chrome.webRequest?.onBeforeRequest) {
       }
     },
     { urls: ['<all_urls>'] }
+  );
+}
+
+let _capturedBatches = [];
+if (chrome.webRequest?.onBeforeRequest) {
+  chrome.webRequest.onBeforeRequest.addListener(
+    (details) => {
+      try {
+        if (details.url && details.url.includes('batchexecute')) {
+          const raw = details.requestBody?.raw;
+          let bodyStr = null;
+          if (raw && raw.length > 0 && raw[0].bytes) {
+            bodyStr = new TextDecoder().decode(new Uint8Array(raw[0].bytes));
+          } else if (details.requestBody?.formData) {
+            bodyStr = JSON.stringify(details.requestBody.formData);
+          }
+          if (bodyStr && (bodyStr.includes('eb1hJf') || bodyStr.includes('f.req'))) {
+            console.log('[CAPTURED BATCHEXECUTE]:', details.url, bodyStr.slice(0, 500));
+            _capturedBatches.push({
+              url: details.url,
+              time: Date.now(),
+              body: bodyStr
+            });
+            if (_capturedBatches.length > 20) _capturedBatches.shift();
+          }
+        }
+      } catch (e) {}
+    },
+    { urls: ['https://flow.google.com/*'] },
+    ['requestBody']
   );
 }
 
@@ -357,6 +388,8 @@ if (chrome.runtime?.onConnect) {
         }
       } else if (msg.method === 'get_captured_video_urls') {
         sendToAgent({ id: msg.id, result: _latestVideoUrls });
+      } else if (msg.method === 'get_captured_batches') {
+        sendToAgent({ id: msg.id, result: _capturedBatches });
       } else if (msg.method === 'exec_tab') {
         const { tabId, code } = msg.params || {};
         try {
@@ -370,6 +403,26 @@ if (chrome.runtime?.onConnect) {
           } else if (code === 'reload') {
             await chrome.tabs.reload(target);
             sendToAgent({ id: msg.id, result: { success: true, reloaded: true, tabId: target } });
+          } else if (code === 'click_start_chip') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: () => {
+                const elms = Array.from(document.querySelectorAll('button, [role="button"], a, input, select')).filter(e => {
+                  const val = (e.innerText || e.getAttribute('aria-label') || e.title || '').trim();
+                  return val === 'Start' || val === 'End';
+                });
+                return {
+                  matches: elms.map(e => ({
+                    tag: e.tagName,
+                    class: e.className,
+                    text: e.innerText,
+                    ariaLabel: e.getAttribute('aria-label'),
+                    html: e.outerHTML.slice(0, 300)
+                  }))
+                };
+              }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
           } else if (code && (code.startsWith('http://') || code.startsWith('https://') || code.startsWith('nav:'))) {
             const destUrl = code.startsWith('nav:') ? code.slice(4).trim() : code.trim();
             await chrome.tabs.update(target, { url: destUrl });
@@ -392,13 +445,17 @@ if (chrome.runtime?.onConnect) {
           } else {
             const results = await chrome.scripting.executeScript({
               target: { tabId: target },
-              func: () => ({
-                success: true,
-                title: document.title,
-                location: window.location.href,
-                imgCount: document.querySelectorAll('img').length,
-                vidCount: document.querySelectorAll('video').length,
-              }),
+              func: () => {
+                const buttons = Array.from(document.querySelectorAll('button, [role="button"], a, input, select')).map(b => (b.innerText || b.getAttribute('aria-label') || b.title || b.value || '').trim()).filter(Boolean);
+                return {
+                  success: true,
+                  title: document.title,
+                  location: window.location.href,
+                  imgCount: document.querySelectorAll('img').length,
+                  vidCount: document.querySelectorAll('video').length,
+                  interactive: Array.from(new Set(buttons)).slice(0, 80),
+                };
+              },
             });
             sendToAgent({ id: msg.id, result: results[0]?.result });
           }
@@ -594,7 +651,7 @@ async function requestCaptchaFromTab(tabId, requestId, pageAction) {
           await chrome.scripting.executeScript({
             target: { tabId },
             files: ['content.js'],
-          });
+});
           await chrome.scripting.executeScript({
             target: { tabId },
             files: ['injected.js'],
@@ -624,10 +681,10 @@ async function reviveTabIfNeeded(tab) {
   return tab;
 }
 
-function captchaFromTab(tabId, requestId, captchaAction) {
+function captchaFromTab(tabId, requestId, captchaAction, timeoutMs = 60000) {
   return Promise.race([
     requestCaptchaFromTab(tabId, requestId, captchaAction),
-    new Promise((_, rej) => setTimeout(() => rej(new Error('CAPTCHA_TIMEOUT')), 30000)),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('CAPTCHA_TIMEOUT')), timeoutMs)),
   ]);
 }
 
@@ -638,7 +695,7 @@ async function solveCaptcha(requestId, captchaAction) {
   if (!tabs.length) {
     try {
       await chrome.tabs.create({ url: FLOW_TAB_URL, active: false });
-      await sleep(3000);
+      await sleep(3500);
       tabs = await chrome.tabs.query({ url: flowUrls });
     } catch (e) {
       return { error: e.message || 'NO_FLOW_TAB' };
@@ -646,44 +703,49 @@ async function solveCaptcha(requestId, captchaAction) {
     if (!tabs.length) return { error: 'NO_FLOW_TAB' };
   }
 
-  // Try each Flow tab in turn. A tab that answers "no grecaptcha" is a tab
-  // sitting on a page that never loaded it — another Flow tab may well be
-  // fine. Returning on the first one let one stale tab veto every generation.
+  // Try each Flow tab in turn with self-healing recovery.
   const errors = [];
   for (const candidate of tabs) {
     const tab = await reviveTabIfNeeded(candidate);
     if (!tab) continue;
     try {
-      const resp = await captchaFromTab(tab.id, requestId, captchaAction);
+      let resp = await captchaFromTab(tab.id, requestId, captchaAction, 45000);
       if (!resp?.token) {
-        errors.push(resp?.error || 'NO_TOKEN');
-        continue;
+        // Tab response lacked token — reload tab once to revive grecaptcha
+        try {
+          console.warn('[Flow Extension] No token returned, reloading tab to revive grecaptcha...', tab.id);
+          await chrome.tabs.reload(tab.id);
+          await sleep(4000);
+          resp = await captchaFromTab(tab.id, requestId, captchaAction, 45000);
+        } catch {}
       }
-      return resp;
+      if (resp?.token) return resp;
+      errors.push(resp?.error || 'NO_TOKEN');
+      continue;
     } catch (e) {
       const msg = e?.message || '';
       errors.push(msg);
-      // Tab evaporated mid-call (window closed, discarded again, navigated
-      // away). Move on to the next candidate rather than failing the job.
-      if (
-        msg.includes('No current window') ||
-        msg.includes('No tab with id') ||
-        msg.includes('Receiving end does not exist')
-      ) {
-        continue;
+      if (msg.includes('CAPTCHA_TIMEOUT')) {
+        try {
+          console.warn('[Flow Extension] Captcha timeout detected. Reloading tab for self-healing...', tab.id);
+          await chrome.tabs.reload(tab.id);
+          await sleep(4000);
+          const retryResp = await captchaFromTab(tab.id, requestId, captchaAction, 45000);
+          if (retryResp?.token) return retryResp;
+        } catch (reErr) {
+          console.error('[Flow Extension] Captcha retry failed:', reErr);
+        }
       }
-      return { error: msg };
+      continue;
     }
   }
 
   // Every candidate failed — last-ditch, spawn a fresh tab and try it once.
   try {
-    await chrome.tabs.create({ url: FLOW_TAB_URL, active: false });
-    await sleep(3000);
-    const fresh = await chrome.tabs.query({ url: flowUrls });
-    const target = fresh.find((t) => !t.discarded) || fresh[0];
-    if (!target) return { error: 'NO_FLOW_TAB' };
-    return await captchaFromTab(target.id, requestId, captchaAction);
+    console.info('[Flow Extension] Spawning fresh Flow tab to solve captcha...');
+    const freshTab = await chrome.tabs.create({ url: FLOW_TAB_URL, active: false });
+    await sleep(4500);
+    return await captchaFromTab(freshTab.id, requestId, captchaAction, 60000);
   } catch (e) {
     return { error: e?.message || errors[0] || 'NO_FLOW_TAB' };
   }
@@ -805,8 +867,8 @@ async function handleBatchRpc(msg) {
   setState('running');
   const hasCaptcha = !!captchaAction;
   if (hasCaptcha) metrics.requestCount++;
-  // Hiển thị các thao tác quan trọng: tạo ảnh, tạo video, up ảnh, đổi tên, tạo dự án
-  const importantRpcs = ['ogiZ0b', 'eb1hJf', 'maseQ', 'mYWVGd', 'jHPbke', 'o8DA4'];
+  // Hiển thị các thao tác quan trọng: tạo ảnh, tạo video, nội suy frame to frame, up ảnh, đổi tên, tạo dự án
+  const importantRpcs = ['ogiZ0b', 'eb1hJf', 'nprQif', 'maseQ', 'mYWVGd', 'jHPbke', 'o8DA4'];
   const visible = hasCaptcha || importantRpcs.includes(rpcid);
   const logType = _classifyRpc(rpcid);
   if (visible) {
