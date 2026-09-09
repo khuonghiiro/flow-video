@@ -9,6 +9,32 @@ const flowUrls = [
 ];
 const FLOW_TAB_URL = 'https://flow.google.com/';
 
+// ─── Side Panel on Action Click ────────────────────────────
+if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
+  chrome.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((error) => console.warn('Failed to setPanelBehavior:', error));
+}
+
+if (chrome.action && chrome.action.onClicked) {
+  chrome.action.onClicked.addListener(async (tab) => {
+    try {
+      if (chrome.sidePanel && chrome.sidePanel.open) {
+        if (tab && tab.windowId) {
+          await chrome.sidePanel.open({ windowId: tab.windowId });
+        } else {
+          const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (currentTab) {
+            await chrome.sidePanel.open({ windowId: currentTab.windowId });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Fallback sidePanel.open failed:', err);
+    }
+  });
+}
+
 let ws = null;
 let flowKey = null;
 let callbackSecret = null;
