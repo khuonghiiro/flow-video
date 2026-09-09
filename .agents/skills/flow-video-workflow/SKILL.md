@@ -70,9 +70,35 @@ If `extension_connected` is `false`, the Chrome Extension must be active and ope
    - Characters / Figures: Use `PORTRAIT` orientation.
    - Locations / Backgrounds: Use `LANDSCAPE` orientation.
 
-## 5. Veo3 Custom Models & Durations
+## 5. Veo3.1 Wire Protocol — RPC Reference
 
-Veo3 extensions patch `VIDEO_MODELS` with:
-- Standard: `4s`, `6s`, `8s`
-- Looping modes: `veo3_loop_4s`, `veo3_loop_6s`, `veo3_loop_8s`
-- Crop & Aspect ratio coordinates supported dynamically via FlowClient patches.
+All video generation goes through `batchexecute` RPCs on `flow.google.com`.
+
+### 5.1 RPC Types & Model Keys
+
+| # | Type | RPC ID | When to Use | Model Keys |
+|---|---|---|---|---|
+| 1 | **T2V** (Text-to-Video) | `YhhmEf` | 0 images, prompt only | 4s: `veo_3_1_t2v_lite_4s_low_priority`, 6s: `veo_3_1_t2v_lite_6s_low_priority`, 8s: `veo_3_1_t2v_lite_low_priority` |
+| 2 | **R2V** (Reference-to-Video) | `MZZa6b` | 1-3 reference images (style/character ref) | `veo_3_1_r2v_lite_low_priority` |
+| 3 | **I2V** (Image-to-Video) | `eb1hJf` | 1 start image only (FlowKit core) | `veo_3_1_i2v_lite_low_priority` |
+| 4 | **F2F** (Frame-to-Frame) | `nprQif` | Start + End frame images | 4s: `veo_3_1_i2v_s_lite_4s_fl_low_priority`, 6s: `veo_3_1_i2v_s_lite_6s_fl_low_priority`, 8s: `veo_3_1_interpolation_lite_low_priority` |
+| 5 | **Poll** (Status check) | `jwpduf` | Check operation progress | N/A |
+
+### 5.2 Item Structure per RPC
+
+**T2V** (5 fields): `[promptBlock, model, aspect, null, [null,null,null,null,U1,U2]]`
+**R2V** (6 fields): `[promptBlock, [[null,ref_id]...], model, aspect, null, [null,null,null,null,U1,U2]]`
+**F2F** (7 fields): `[promptBlock, model, aspect, null, [null,start_id,null,null,null,crop], [null,end_id,null,null,null,crop], [null,null,null,null,U1,U2]]`
+
+### 5.3 Count / Batch
+
+Each RPC supports 1-4 parallel generations. The `count` parameter replicates items in `parsedPayload[0][]`. Each item gets unique client tracking UUIDs.
+
+### 5.4 Critical Rules
+
+- **NEVER** use `MZZa6b` for T2V (0 images) — use `YhhmEf`
+- **NEVER** use `eb1hJf` for R2V (reference images) — use `MZZa6b`
+- F2F 4s/6s uses `i2v_s_lite_*s_fl_*` model keys, NOT `interpolation_*`
+- F2F 8s uses `interpolation_lite_low_priority` (no duration suffix)
+- Code: `veo3_batch.py` handles T2V/R2V/F2F builders, `extension_patcher.py` handles routing
+

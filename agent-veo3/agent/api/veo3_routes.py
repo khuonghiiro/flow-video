@@ -63,6 +63,7 @@ class EnhancedGenerateVideoRefsRequest(BaseModel):
     user_paygate_tier: str = "PAYGATE_TIER_ONE"
     model_family: Literal["veo", "omni_flash"] = "veo"
     duration_s: int = 8
+    count: int = 1
 
 
 class StartPipelineRequest(BaseModel):
@@ -166,13 +167,8 @@ async def generate_video_enhanced(body: EnhancedGenerateVideoRequest):
             logger.error("Omni Flash video generation error: %s", exc, exc_info=True)
             raise HTTPException(502, f"Omni Flash generation error: {exc}") from exc
     else:
-        if not body.start_image_media_id:
-            raise HTTPException(
-                400,
-                "Veo requires start_image_media_id. For Text-to-Video, set model_family='omni_flash'.",
-            )
         result = await client.generate_video(
-            start_image_media_id=body.start_image_media_id,
+            start_image_media_id=body.start_image_media_id or "",
             prompt=body.prompt,
             project_id=body.project_id,
             scene_id=body.scene_id,
@@ -181,6 +177,7 @@ async def generate_video_enhanced(body: EnhancedGenerateVideoRequest):
             user_paygate_tier=body.user_paygate_tier,
             duration=float(dur_s),
             crop_coordinates=body.crop_coordinates,
+            count=body.count,
         )
 
     if result.get("error") or (isinstance(result.get("status"), int) and result["status"] >= 400):
@@ -232,6 +229,7 @@ async def generate_video_refs_enhanced(body: EnhancedGenerateVideoRefsRequest):
         scene_id=body.scene_id,
         aspect_ratio=body.aspect_ratio,
         user_paygate_tier=body.user_paygate_tier,
+        count=body.count,
     )
 
     if result.get("error") or (isinstance(result.get("status"), int) and result["status"] >= 400):

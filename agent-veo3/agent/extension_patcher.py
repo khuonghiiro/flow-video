@@ -135,6 +135,7 @@ def patch_flow_client():
         )
         from agent import config
         from agent.services import flow_batch as fb
+        from agent.services import veo3_batch as vb
 
         orig_generate_video = FlowClient.generate_video
 
@@ -168,22 +169,27 @@ def patch_flow_client():
             model: str = "veo_3_1_interpolation_lite_low_priority",
             start_image_media_id: str = "",
             end_image_media_id: str = "",
+            count: int = 1,
+            duration_s: Any = 8,
         ) -> str:
             start_id = start_media_id or start_image_media_id
             end_id = end_media_id or end_image_media_id
             crop_val = [None, None, 1, 1] if crop is None else crop
             asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
-            inner = [
-                [[[None, None, [[[prompt]]]],
-                  resolve_interp_model(model),
-                  asp_val,
-                  None,
-                  [None, start_id, None, None, None, crop_val],
-                  [None, end_id, None, None, None, crop_val],
-                  [None, None, None, None, fb._client_uuid(), fb._client_uuid()]]],
-                fb._context(project_id),
-                [fb._client_uuid(), 1],
-            ]
+            # Pick model by duration: 4s/6s → i2v_s_lite_*s_fl, 8s → interpolation
+            resolved_model = vb.resolve_f2f_model(duration_s) if model == "veo_3_1_interpolation_lite_low_priority" else resolve_interp_model(model)
+            items = []
+            for _ in range(max(1, min(count, 4))):
+                items.append([
+                    [None, None, [[[prompt]]]],
+                    resolved_model,
+                    asp_val,
+                    None,
+                    [None, start_id, None, None, None, crop_val],
+                    [None, end_id, None, None, None, crop_val],
+                    [None, None, None, None, fb._client_uuid(), fb._client_uuid()],
+                ])
+            inner = [items, fb._context(project_id), [fb._client_uuid(), 1]]
             return fb.build_envelope(RPC_GEN_INTERPOLATION, inner)
 
         # Ensure flow_batch has interpolation capabilities exposed
@@ -217,23 +223,25 @@ def patch_flow_client():
             reference_media_ids: Optional[list] = None,
             aspect: Any = None,
             model: str = "veo_3_1_r2v_lite_low_priority",
+            count: int = 1,
         ) -> str:
-            """Build Reference-to-Video (or Text-to-Video) request envelope (RPC: MZZa6b).
-            Supports 0 to 3 reference images.
+            """Build Reference-to-Video request envelope (RPC: MZZa6b).
+            Supports 1 to 3 reference images with count 1-4.
             """
             refs = reference_media_ids or []
             ref_list = [[None, mid] for mid in refs[:3] if mid]
             asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
-            inner = [
-                [[[None, None, [[[prompt]]]],
-                  ref_list,
-                  resolve_r2v_model(model),
-                  asp_val,
-                  None,
-                  [None, None, None, None, fb._client_uuid(), fb._client_uuid()]]],
-                fb._context(project_id),
-                [fb._client_uuid(), 1],
-            ]
+            items = []
+            for _ in range(max(1, min(count, 4))):
+                items.append([
+                    [None, None, [[[prompt]]]],
+                    ref_list,
+                    resolve_r2v_model(model),
+                    asp_val,
+                    None,
+                    [None, None, None, None, fb._client_uuid(), fb._client_uuid()],
+                ])
+            inner = [items, fb._context(project_id), [fb._client_uuid(), 1]]
             return fb.build_envelope(RPC_GEN_VIDEO_REFS, inner)
 
         fb.RPC_GEN_VIDEO_REFS = RPC_GEN_VIDEO_REFS
@@ -277,6 +285,7 @@ def patch_flow_client():
             user_paygate_tier: str = "PAYGATE_TIER_TWO",
             duration: Optional[float] = 4.0,
             crop_coordinates: Optional[dict] = None,
+            count: int = 1,
         ) -> dict:
             from agent.config import USE_BATCH_RPC, FLOW_ALLOW_DEGRADED
             from agent.services import flow_batch as fb
@@ -290,27 +299,32 @@ def patch_flow_client():
                 pid = self._batch_project_id(project_id)
 
                 if end_image_media_id:
-                    batch_model = resolve_interp_model(
-                        "veo_3_1_interpolation_fast_ultra" if "ultra" in str(user_paygate_tier).lower()
-                        else "veo_3_1_interpolation_lite_low_priority"
-                    )
+                    # 1. Frame-to-Frame interpolation (start + end) → nprQif
+                    batch_model = vb.resolve_f2f_model(duration, user_paygate_tier)
                     logger.info(
-                        "[VEO3 BATCH INTERPOLATION DISPATCH] model=%s aspect=%s start=%s end=%s",
-                        batch_model, aspect_ratio, start_image_media_id[:12], end_image_media_id[:12]
+                        "[VEO3 BATCH F2F DISPATCH] model=%s aspect=%s duration=%s start=%s end=%s",
+                        batch_model, aspect_ratio, duration,
+                        start_image_media_id[:12], end_image_media_id[:12]
                     )
                     try:
                         freq = build_interpolation_request(
                             prompt, pid, start_image_media_id, end_image_media_id,
                             crop=crop_list, aspect=aspect_ratio, model=batch_model,
+                            duration_s=duration, count=count,
                         )
                         payload = await self._batch_payload(
                             RPC_GEN_INTERPOLATION, freq, fb.CAPTCHA_VIDEO, timeout=120
                         )
                         logger.info("[VEO3 NPRQIF RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
-                        operation = fb.read_operation(payload)
+                        if count > 1:
+                            operations = vb.read_all_operations(payload)
+                        else:
+                            op = fb.read_operation(payload)
+                            operations = [op] if op else []
                     except Exception as e:
                         return _batch_error(e)
                 elif start_image_media_id:
+                    # 2. Image-to-Video (start image only) → eb1hJf
                     batch_model = self._batch_video_model(user_paygate_tier, gen_type, aspect_ratio)
                     logger.info(
                         "[VEO3 BATCH I2V DISPATCH] gen_type=%s model=%s aspect=%s duration=%s",
@@ -324,23 +338,43 @@ def patch_flow_client():
                         payload = await self._batch_payload(
                             fb.RPC_GEN_VIDEO, freq, fb.CAPTCHA_VIDEO, timeout=120
                         )
-                        operation = fb.read_operation(payload)
+                        op = fb.read_operation(payload)
+                        operations = [op] if op else []
                     except Exception as e:
                         return _batch_error(e)
                 else:
-                    # 3. Text-to-Video (0 images) via MZZa6b with empty reference list
-                    logger.info("[VEO3 BATCH T2V DISPATCH] 0 images -> routing to R2V empty reference list (MZZa6b)")
-                    return await self.generate_video_from_references(
-                        reference_media_ids=[],
-                        prompt=prompt,
-                        project_id=pid,
-                        scene_id=scene_id,
-                        aspect_ratio=aspect_ratio,
-                        user_paygate_tier=user_paygate_tier,
+                    # 3. Text-to-Video (0 images) → YhhmEf
+                    t2v_model = vb.resolve_t2v_model(duration)
+                    logger.info(
+                        "[VEO3 BATCH T2V DISPATCH] RPC=YhhmEf model=%s aspect=%s duration=%s",
+                        t2v_model, aspect_ratio, duration
                     )
+                    try:
+                        freq = vb.build_t2v_request(
+                            prompt=prompt,
+                            project_id=pid,
+                            aspect=aspect_ratio,
+                            model=t2v_model,
+                            count=count,
+                        )
+                        payload = await self._batch_payload(
+                            vb.RPC_GEN_T2V, freq, fb.CAPTCHA_VIDEO, timeout=120
+                        )
+                        logger.info("[VEO3 T2V RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
+                        if count > 1:
+                            operations = vb.read_all_operations(payload)
+                        else:
+                            op = fb.read_operation(payload)
+                            operations = [op] if op else []
+                    except Exception as e:
+                        return _batch_error(e)
 
-                self._remember_operation(operation.operation_id, pid)
-                return {"status": 200, "data": {"operations": [_as_pending_operation(operation.operation_id)]}}
+                # Return all operations
+                for op in operations:
+                    if op and op.operation_id:
+                        self._remember_operation(op.operation_id, pid)
+                ops_list = [_as_pending_operation(op.operation_id) for op in operations if op and op.operation_id]
+                return {"status": 200, "data": {"operations": ops_list}}
 
             # ─── Legacy REST transport fallback (pre-migration aisandbox-pa) ───
             model_key = resolve_video_model_key(
@@ -420,20 +454,29 @@ def patch_flow_client():
                     RPC_GEN_VIDEO_REFS, batch_model, aspect_ratio, len(reference_media_ids or [])
                 )
                 try:
+                    count = kwargs.get("count", 1)
                     freq = build_r2v_request(
                         prompt=prompt,
                         project_id=pid,
                         reference_media_ids=reference_media_ids or [],
                         aspect=aspect_ratio,
                         model=batch_model,
+                        count=count,
                     )
                     payload = await self._batch_payload(
                         RPC_GEN_VIDEO_REFS, freq, fb.CAPTCHA_VIDEO, timeout=120
                     )
                     logger.info("[VEO3 MZZa6b RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
-                    operation = fb.read_operation(payload)
-                    self._remember_operation(operation.operation_id, pid)
-                    return {"status": 200, "data": {"operations": [_as_pending_operation(operation.operation_id)]}}
+                    if count > 1:
+                        operations = vb.read_all_operations(payload)
+                    else:
+                        op = fb.read_operation(payload)
+                        operations = [op] if op else []
+                    for op in operations:
+                        if op and op.operation_id:
+                            self._remember_operation(op.operation_id, pid)
+                    ops_list = [_as_pending_operation(op.operation_id) for op in operations if op and op.operation_id]
+                    return {"status": 200, "data": {"operations": ops_list}}
                 except Exception as e:
                     return _batch_error(e)
 

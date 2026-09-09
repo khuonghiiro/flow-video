@@ -66,29 +66,35 @@ const TYPE_LABELS = {
   TRPC:                       'TRPC Link',
   API:                        'API Flow',
 
-  // Fallback Google RPC Codes
-  'RPC:ogiZ0b':               'Tạo ảnh',
-  'ogiZ0b':                   'Tạo ảnh',
-  'RPC:eb1hJf':               'Tạo video',
-  'eb1hJf':                   'Tạo video',
+  // Fallback Google RPC Codes → Tên hiển thị thân thiện
+  'RPC:ogiZ0b':               'Tạo ảnh từ prompt',
+  'ogiZ0b':                   'Tạo ảnh từ prompt',
+  'RPC:YhhmEf':               'Tạo video từ prompt',
+  'YhhmEf':                   'Tạo video từ prompt',
+  'RPC:eb1hJf':               'Tạo video từ ảnh',
+  'eb1hJf':                   'Tạo video từ ảnh',
   'RPC:nprQif':               'Nối frame video',
   'nprQif':                   'Nối frame video',
-  'RPC:MZZa6b':               'Tạo video ref',
-  'MZZa6b':                   'Tạo video ref',
-  'RPC:maseQ':                'Up ảnh',
-  'maseQ':                    'Up ảnh',
-  'RPC:mYWVGd':               'Đổi tên',
-  'mYWVGd':                   'Đổi tên',
-  'RPC:jHPbke':               'Tạo dự án',
-  'jHPbke':                   'Tạo dự án',
+  'RPC:MZZa6b':               'Video từ ảnh tham chiếu',
+  'MZZa6b':                   'Video từ ảnh tham chiếu',
+  'RPC:jwpduf':               'Kiểm tra trạng thái video',
+  'jwpduf':                   'Kiểm tra trạng thái video',
+  'RPC:maseQ':                'Tải ảnh lên',
+  'maseQ':                    'Tải ảnh lên',
+  'RPC:mYWVGd':               'Đổi tên asset',
+  'mYWVGd':                   'Đổi tên asset',
+  'RPC:jHPbke':               'Tạo dự án mới',
+  'jHPbke':                   'Tạo dự án mới',
   'RPC:o8DA4':                'Đổi tên dự án',
   'o8DA4':                    'Đổi tên dự án',
-  'RPC:wXbhsf':               'Check video',
-  'wXbhsf':                   'Check video',
+  'RPC:wXbhsf':               'Kiểm tra trạng thái',
+  'wXbhsf':                   'Kiểm tra trạng thái',
   'RPC:kFhKBc':               'Tải media',
   'kFhKBc':                   'Tải media',
-  'RPC:vv2eKe':               'DS media',
-  'vv2eKe':                   'DS media',
+  'RPC:vv2eKe':               'Danh sách media',
+  'vv2eKe':                   'Danh sách media',
+  'RPC:as29s':                'Lấy link media',
+  'as29s':                    'Lấy link media',
 };
 
 function formatType(type, entry = null) {
@@ -101,16 +107,18 @@ function formatType(type, entry = null) {
 
   // Inspect URL or fallback
   const url = entry?.url || '';
-  if (url.includes('uploadImage') || stripped === 'maseQ') return 'Up ảnh';
-  if (url.includes('batchGenerateImages') || stripped === 'ogiZ0b') return 'Tạo ảnh';
-  if (url.includes('batchAsyncGenerateVideo') || stripped === 'eb1hJf') return 'Tạo video';
+  if (url.includes('uploadImage') || stripped === 'maseQ') return 'Tải ảnh lên';
+  if (url.includes('batchGenerateImages') || stripped === 'ogiZ0b') return 'Tạo ảnh từ prompt';
+  if (stripped === 'YhhmEf') return 'Tạo video từ prompt';
+  if (url.includes('batchAsyncGenerateVideo') || stripped === 'eb1hJf') return 'Tạo video từ ảnh';
   if (stripped === 'nprQif') return 'Nối frame video';
-  if (stripped === 'MZZa6b') return 'Tạo video ref';
-  if (url.includes('ReferenceImages')) return 'Tạo video ref';
+  if (stripped === 'MZZa6b') return 'Video từ ảnh tham chiếu';
+  if (stripped === 'jwpduf') return 'Kiểm tra trạng thái video';
+  if (url.includes('ReferenceImages')) return 'Video từ ảnh tham chiếu';
   if (url.includes('UpsampleVideo')) return 'Nâng cấp video';
-  if (url.includes('createProject') || stripped === 'jHPbke') return 'Tạo dự án';
+  if (url.includes('createProject') || stripped === 'jHPbke') return 'Tạo dự án mới';
   if (url.includes('rename') || stripped === 'mYWVGd' || stripped === 'o8DA4') return 'Đổi tên';
-  if (url.includes('fetch_blob') || url.includes('/media/')) return 'Tải ảnh';
+  if (url.includes('fetch_blob') || url.includes('/media/')) return 'Tải media';
 
   return type.length > 12 ? type.slice(0, 12) : type;
 }
