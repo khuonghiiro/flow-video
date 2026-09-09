@@ -18,23 +18,35 @@ Usage: `/fk-unwatermark <đường_dẫn_ảnh_hoặc_thư_mục> [--output <đ�
 
 ---
 
-## 🏗️ Cấu Trúc Mã Nguồn & Phân Định Test/Production
+## 🏗️ Cấu Trúc Mã Nguồn & Quy Chuẩn Thư Mục I/O
 
-Tuân thủ nguyên tắc phân tách rõ ràng giữa mã nguồn chính thức và kịch bản thử nghiệm:
+Tuân thủ nguyên tắc phân tách rõ ràng giữa mã nguồn chính thức, kịch bản thử nghiệm và luồng thư mục xử lý ảnh:
 
 ```
 agent-veo3/
 ├── assets/watermarks/                  # Template mask chuẩn (bg_48.png, bg_96.png)
+├── output/
+│   ├── watermarks/                     # [I/O] Thư mục lưu ảnh tải về còn chứa watermark từ Google Flow
+│   └── cleaned/                        # [I/O] Thư mục lưu ảnh sau khi đã khử sạch 100% logo
 ├── scripts/
 │   ├── remove_gemini_watermark.py      # [PRODUCTION] Logic xử lý chính (Được commit Git)
 │   └── tests/                          # [TESTING] Thư mục chứa script kiểm thử (ĐÃ ĐƯA VÀO .gitignore, KHÔNG PUSH GIT)
-│       └── test_e2e_generate_and_unwatermark.py
+│       └── test_full_pipeline_clean_flow.py
 └── skills_vi/
     └── fk-unwatermark.md               # Tài liệu hướng dẫn Tiếng Việt
 ```
 
-* **Logic xử lý chính thức (`agent-veo3/scripts/`):** File `remove_gemini_watermark.py` dùng để xử lý thật trong pipeline và được lưu trữ trên Git.
-* **Kịch bản kiểm thử (`agent-veo3/scripts/tests/`):** Toàn bộ file chạy thử nghiệm, gọi API test sinh ảnh ngẫu nhiên, benchmark tốc độ đều đặt tại `agent-veo3/scripts/tests/`. Thư mục này nằm trong `.gitignore` nên **không bao giờ bị đẩy lên Git**.
+### 📂 Quy Chuẩn Luồng Xử Lý & Upload Ảnh Lên Flow
+1. **Tải ảnh thô về:** Tất cả ảnh do Flow sinh ra có logo watermark PHẢI được lưu vào `agent-veo3/output/watermarks/`.
+2. **Khử logo:** Thuật toán xử lý và xuất ảnh sạch sang thư mục riêng biệt `agent-veo3/output/cleaned/`.
+3. **Upload ảnh sạch lên Flow:**
+   - AI quét đúng các file trong `agent-veo3/output/cleaned/`.
+   - Kiểm tra hash/tên file đã upload trong metadata để **tuyệt đối không upload trùng lặp 2 lần cùng một ảnh**.
+   - Lưu lại `media_id` (UUID 36 ký tự) sạch trả về từ Google Flow.
+4. **Tạo video từ ảnh đã upload:**
+   - **1 ảnh (Single Frame):** Bắt buộc dùng logic **I2V (Image-to-Video)** qua RPC `eb1hJf` (chỉ truyền duy nhất `start_image_media_id`), **tuyệt đối KHÔNG dùng logic F2F (Frame-to-Frame / Interpolation - `nprQif`)**.
+   - **2 ảnh (Start & End Frame):** Sử dụng logic **F2F** qua RPC `nprQif`.
+   - **1-3 ảnh tham chiếu phong cách/nhân vật:** Sử dụng logic **R2V** qua RPC `MZZa6b`.
 
 ---
 

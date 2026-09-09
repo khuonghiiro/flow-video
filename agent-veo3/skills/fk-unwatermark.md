@@ -15,16 +15,25 @@ Usage: `/fk-unwatermark <image_or_dir_path> [--output <output_path>] [--alpha 0.
 ```
 agent-veo3/
 ├── assets/watermarks/                  # Calibrated alpha masks (bg_48.png, bg_96.png)
+├── output/
+│   ├── watermarks/                     # [I/O] Raw downloaded images with watermarks from Google Flow
+│   └── cleaned/                        # [I/O] Restored clean images with 100% pixel fidelity
 ├── scripts/
 │   ├── remove_gemini_watermark.py      # [PRODUCTION] Core processing logic (Committed to Git)
 │   └── tests/                          # [TESTING] Test scripts (IGNORED by .gitignore, NEVER pushed to Git)
-│       └── test_e2e_generate_and_unwatermark.py
+│       └── test_full_pipeline_clean_flow.py
 └── skills/
     └── fk-unwatermark.md               # English skill reference
 ```
 
-- **Production Logic (`agent-veo3/scripts/`):** Contains `remove_gemini_watermark.py` used in production pipelines and tracked by Git.
-- **Testing Scripts (`agent-veo3/scripts/tests/`):** Contains test, verification, and benchmark scripts. This folder is added to `agent-veo3/.gitignore` and is **never pushed to Git**.
+### Folder Conventions & Flow Upload Rules
+1. **Raw Downloads:** Always save downloaded images containing watermarks into `agent-veo3/output/watermarks/`.
+2. **Cleaned Output:** Always output unwatermarked images to `agent-veo3/output/cleaned/`.
+3. **Flow Upload:** AI scans `agent-veo3/output/cleaned/` and tracks uploaded UUIDs to **never upload duplicate images**.
+4. **Video Generation Dispatch:**
+   - **Single Frame (1 Image):** Strictly use **I2V (Image-to-Video)** via RPC `eb1hJf` (only pass `start_image_media_id`). **Never use Frame-to-Frame (`nprQif`) for single-frame generation.**
+   - **Start & End Frame (2 Images):** Use **F2F** interpolation via RPC `nprQif`.
+   - **Reference Images (1-3 Images):** Use **R2V** via RPC `MZZa6b`.
 
 ---
 

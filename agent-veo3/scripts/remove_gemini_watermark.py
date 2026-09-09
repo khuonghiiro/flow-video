@@ -168,7 +168,10 @@ def process_file(
     cleaned = remove_watermark(img, alpha_peak=alpha_peak)
     
     if output_path is None:
-        out_p = in_p.parent / f"{in_p.stem}_cleaned{in_p.suffix}"
+        if in_p.parent.name == "watermarks":
+            out_p = in_p.parent.parent / "cleaned" / f"{in_p.stem}{in_p.suffix}"
+        else:
+            out_p = in_p.parent / f"{in_p.stem}_cleaned{in_p.suffix}"
     else:
         out_p = Path(output_path)
         
@@ -188,7 +191,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Khử logo watermark Gemini/Imagen mà vẫn giữ nguyên độ nét pixel."
     )
-    parser.add_argument("input", help="Đường dẫn tới file ảnh hoặc thư mục ảnh cần xử lý")
+    parser.add_argument("input", nargs="?", default=None, help="Đường dẫn tới file ảnh hoặc thư mục ảnh cần xử lý")
     parser.add_argument("-o", "--output", help="Đường dẫn file hoặc thư mục xuất (tùy chọn)")
     parser.add_argument(
         "-a", "--alpha",
@@ -198,7 +201,17 @@ def main():
     )
     args = parser.parse_args()
     
-    in_path = Path(args.input)
+    # Mặc định quét agent-veo3/output/watermarks nếu không truyền tham số
+    if args.input is None:
+        script_dir = Path(__file__).resolve().parent
+        default_watermarks = script_dir.parent / "output" / "watermarks"
+        if default_watermarks.exists():
+            in_path = default_watermarks
+        else:
+            in_path = script_dir.parent / "output"
+    else:
+        in_path = Path(args.input)
+        
     if in_path.is_file():
         process_file(in_path, args.output, alpha_peak=args.alpha)
     elif in_path.is_dir():
@@ -209,6 +222,8 @@ def main():
             out_file = None
             if args.output:
                 out_file = Path(args.output) / f.name
+            elif in_path.name == "watermarks":
+                out_file = in_path.parent / "cleaned" / f.name
             process_file(f, out_file, alpha_peak=args.alpha)
     else:
         print(f"[ERROR] Đường dẫn không hợp lệ: {in_path}")
