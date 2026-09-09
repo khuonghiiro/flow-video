@@ -29,6 +29,3 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 archive_upstream_copies/
-
-# Scratch & Test scripts (local only, never commit to git)
-scripts/tests/
