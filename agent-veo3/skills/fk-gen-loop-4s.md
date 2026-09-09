@@ -1,22 +1,25 @@
-# /fk-gen-loop-4s — Tạo Animation Loop 4s (Start & End Frame Trùng Nhau)
+# /fk-gen-loop-4s — Generate 4s Seamless Loop Video (Identical Start & End Frames)
 
-Kỹ năng tạo video hoạt ảnh lặp vô tận (seamless loop 4 giây) cho nhân vật 2D / Sprite / VFX từ **Tab 4: Trợ Lý Prompt AI**.
+Skill to generate seamless 4-second looping character animations (idle breathing, hovering, combat stance) for 2D sprites, VFX, and avatars.
 
-Usage: `/fk-gen-loop-4s <project_id> <video_id> [scene_id]`
+> *User Reference (Tiếng Việt)*: See [../skills_vi/fk-gen-loop-4s.md](../skills_vi/fk-gen-loop-4s.md) for the Vietnamese documentation.
 
----
-
-## 🎯 Nguyên Lý Hoạt Động (Start-End Frame Loop)
-- Để tạo chuyển động khép kín hoàn hảo (seamless loop) cho Sprite 2D (ví dụ: Idle thở, vung kiếm, tóc bay, bay bổng):
-  1. Tạo hoặc chọn ảnh tĩnh gốc làm chuẩn (`start_frame`).
-  2. **Gán chính ảnh đó làm `end_frame`** (`end_scene_media_id = image_media_id`).
-  3. API Veo3/Flow sẽ gọi `start_end_frame_2_video` (i2v_fl) với thời lượng 4s, ép frame đầu (0s) và frame cuối (4s) phải trùng khớp 100%, tạo ra chu kỳ chuyển động lặp vô tận.
+**Usage:** `/fk-gen-loop-4s <project_id> <video_id> [scene_id]`
 
 ---
 
-## 📋 Các Bước Thực Hiện Chi Tiết
+## 🎯 Mechanism (Start-End Frame Matching)
 
-### Bước 0: Xác định Orientation & Lấy thông tin Project
+To create a closed-loop animation:
+1. Select or generate a base static frame (`start_frame`).
+2. **Assign that exact frame as the end frame** (`end_scene_media_id = image_media_id`).
+3. Veo3 dispatches via `start_end_frame_2_video` (RPC `nprQif`) with a 4s duration, constraining frame 0s and frame 4s to match identically, producing an infinite loop.
+
+---
+
+## 📋 Step-by-Step Procedure
+
+### Step 0: Check Orientation & Fetch Project Meta
 ```bash
 PROJ_OUT=$(curl -s http://127.0.0.1:8100/api/projects/<PID>/output-dir)
 OUTDIR=$(echo "$PROJ_OUT" | python3 -c "import sys,json; print(json.load(sys.stdin)['path'])")
@@ -24,28 +27,25 @@ ORI=$(cat ${OUTDIR}/meta.json | python3 -c "import sys,json; print(json.load(sys
 ori=$(echo "$ORI" | tr '[:upper:]' '[:lower:]')
 ```
 
-### Bước 1: Kiểm tra ảnh của Scene
-Lấy danh sách scene của video:
+### Step 1: Verify Scene Image
+Fetch scenes for the video:
 ```bash
 curl -s "http://127.0.0.1:8100/api/scenes?video_id=<VID>"
 ```
-- Nếu scene chưa có ảnh (`${ori}_image_status != "COMPLETED"`): Chạy `/fk-gen-images <PID> <VID>` trước.
-- Đảm bảo `${ori}_image_media_id` là UUID hợp lệ.
+- If scene has no image yet (`${ori}_image_status != "COMPLETED"`): run `/fk-gen-images <PID> <VID>` first.
+- Confirm `${ori}_image_media_id` is a valid 36-char UUID.
 
-### Bước 2: Thiết lập Start Frame = End Frame cho Scene
-Với mỗi scene cần làm animation loop, gán `${ori}_end_scene_media_id` bằng chính `${ori}_image_media_id`:
+### Step 2: Set Start Frame = End Frame
+For every scene requiring a loop, assign `${ori}_end_scene_media_id` to `${ori}_image_media_id`:
 ```bash
-# Lấy IMG_ID hiện tại của scene
 IMG_ID=$(curl -s "http://127.0.0.1:8100/api/scenes/<SID>" | python3 -c "import sys,json; print(json.load(sys.stdin)['${ori}_image_media_id'])")
 
-# PATCH gán end_scene_media_id = IMG_ID (tạo vòng lặp khép kín)
 curl -X PATCH http://127.0.0.1:8100/api/scenes/<SID> \
   -H "Content-Type: application/json" \
   -d "{\"${ori}_end_scene_media_id\": \"${IMG_ID}\"}"
 ```
 
-### Bước 3: Cập nhật Transition Prompt chuẩn 4s Loop
-Cập nhật prompt chuyển động (chú ý giữ vững phông xanh `#00FF00` và chuyển động quay về điểm xuất phát):
+### Step 3: Set Transition Prompt for 4s Loop
 ```bash
 curl -X PATCH http://127.0.0.1:8100/api/scenes/<SID> \
   -H "Content-Type: application/json" \
@@ -54,7 +54,7 @@ curl -X PATCH http://127.0.0.1:8100/api/scenes/<SID> \
   }'
 ```
 
-### Bước 4: Gửi Batch Request tạo Video
+### Step 4: Submit Batch Video Generation Request
 ```bash
 curl -X POST http://127.0.0.1:8100/api/requests/batch \
   -H "Content-Type: application/json" \
@@ -65,13 +65,10 @@ curl -X POST http://127.0.0.1:8100/api/requests/batch \
   }'
 ```
 
-Server sẽ tự động kích hoạt `start_end_frame_2_video` vì đã có `end_scene_media_id`.
+The server automatically invokes `start_end_frame_2_video` (RPC `nprQif`) because `end_scene_media_id` is populated.
 
-### Bước 5: Chờ hoàn tất & Đưa vào Studio 2D
-Poll trạng thái:
+### Step 5: Poll Status
 ```bash
 curl -s "http://127.0.0.1:8100/api/requests/batch-status?video_id=<VID>&type=GENERATE_VIDEO"
 ```
-Khi `done: true`, video loop 4s sẵn sàng. Người dùng có thể:
-1. Chuyển sang **Tab 1.3: Video Animation Slicer & AI Matting** trong Studio 2D để tự động cắt thành các frame PNG trong suốt.
-2. Nạp vào **Tab 1.2: Animation Sequencer** để tạo hoạt ảnh sprite sheet trong game/ứng dụng.
+When `done: true`, the seamless 4s loop is ready.
