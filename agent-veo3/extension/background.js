@@ -106,6 +106,32 @@ function broadcastRequestLog() {
   chrome.runtime.sendMessage({ type: 'REQUEST_LOG_UPDATE', log: requestLog }).catch(() => {});
 }
 
+// ─── Sniffer Logs Storage & Broadcast ───────────────────────
+let snifferLogs = [];
+
+function addSnifferLog(record) {
+  const existingIdx = snifferLogs.findIndex(r => r.id === record.id);
+  if (existingIdx !== -1) {
+    snifferLogs[existingIdx] = record;
+  } else {
+    snifferLogs.push(record);
+  }
+  snifferLogs.sort((a, b) => {
+    const tA = a.time ? new Date(a.time).getTime() : 0;
+    const tB = b.time ? new Date(b.time).getTime() : 0;
+    return tA - tB;
+  });
+  if (snifferLogs.length > 100) snifferLogs.shift();
+  chrome.storage.local.set({ sniffer_logs: snifferLogs }).catch(() => {});
+  chrome.runtime.sendMessage({ type: 'SNIFFER_RECORD_CAPTURED', record }).catch(() => {});
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.sniffer_logs) {
+    snifferLogs = Array.isArray(changes.sniffer_logs.newValue) ? changes.sniffer_logs.newValue : [];
+  }
+});
+
 let initializationPromise = null;
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -135,13 +161,41 @@ function ensureInitialized() {
 }
 
 async function initialize() {
-  const data = await chrome.storage.local.get(['flowKey', 'metrics', 'callbackSecret']);
+  const data = await chrome.storage.local.get(['flowKey', 'metrics', 'callbackSecret', 'sniffer_logs']);
   if (data.flowKey) flowKey = data.flowKey;
   if (data.metrics) Object.assign(metrics, data.metrics);
   if (data.callbackSecret) callbackSecret = data.callbackSecret;
+  if (Array.isArray(data.sniffer_logs)) snifferLogs = data.sniffer_logs;
   connectToAgent();
   chrome.alarms.create('keepAlive', { periodInMinutes: 0.4 });
+  void autoInjectFlowTabs();
 }
+
+async function autoInjectFlowTabs() {
+  try {
+    const allTabs = await chrome.tabs.query({});
+    const flowTabs = allTabs.filter(t => t.url && (t.url.includes('flow.google.com') || t.url.includes('labs.google')));
+    for (const tab of flowTabs) {
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+      } catch {}
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['injected.js'] });
+      } catch {}
+    }
+  } catch {}
+}
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url && (tab.url.includes('flow.google.com') || tab.url.includes('labs.google'))) {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    } catch {}
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['injected.js'] });
+    } catch {}
+  }
+});
 
 // MV3 workers can be suspended and restarted without onStartup firing.
 // Rehydrate the persisted Flow key on every worker start.
@@ -1213,6 +1267,37 @@ chrome.runtime.onMessage.addListener((msg, _, reply) => {
 
   if (msg.type === 'TRPC_MEDIA_URLS') {
     handleTrpcMediaUrls(msg.trpcUrl, msg.body);
+    reply({ ok: true });
+    return true;
+  }
+
+  // ─── API Sniffer Handlers ──────────────────────────────────
+  if (msg.type === 'API_SNIFFED_RECORD' && msg.record) {
+    addSnifferLog(msg.record);
+    reply({ ok: true });
+    return true;
+  }
+
+  if (msg.type === 'SYNC_SNIFFER_CONFIG') {
+    chrome.tabs.query({}).then((allTabs) => {
+      const flowTabs = allTabs.filter(t => t.url && (t.url.includes('flow.google.com') || t.url.includes('labs.google')));
+      for (const tab of flowTabs) {
+        chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+      }
+    }).catch(() => {});
+    reply({ ok: true });
+    return true;
+  }
+
+  if (msg.type === 'GET_SNIFFER_LOGS') {
+    reply({ logs: snifferLogs });
+    return true;
+  }
+
+  if (msg.type === 'CLEAR_SNIFFER_LOGS') {
+    snifferLogs = [];
+    chrome.storage.local.set({ sniffer_logs: [] }).catch(() => {});
+    chrome.runtime.sendMessage({ type: 'SNIFFER_LOG_UPDATED', logs: [] }).catch(() => {});
     reply({ ok: true });
     return true;
   }

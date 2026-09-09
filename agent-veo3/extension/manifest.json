@@ -18,8 +18,7 @@
     {
       "matches": [
         "https://flow.google.com/*",
-        "https://labs.google/fx/tools/flow*",
-        "https://labs.google/fx/*/tools/flow*"
+        "https://labs.google/*"
       ],
       "js": ["content.js"],
       "run_at": "document_start"

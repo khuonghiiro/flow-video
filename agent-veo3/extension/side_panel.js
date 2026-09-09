@@ -386,7 +386,7 @@ document.getElementById('btn-reload-ext')?.addEventListener('click', () => {
 
 // ── Init ─────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
+function bootOps() {
   // Keep background worker alive while side panel is open
   try {
     const _port = chrome.runtime.connect({ name: 'FLOW_KEEPALIVE' });
@@ -395,4 +395,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   fetchStatus();
   fetchLog();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootOps);
+} else {
+  bootOps();
+}

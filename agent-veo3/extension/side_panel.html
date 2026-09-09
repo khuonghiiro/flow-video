@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Flow Kit</title>
+  <link rel="stylesheet" href="sniffer.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -509,6 +510,14 @@
     </div>
   </header>
 
+  <!-- Navigation Tabs -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="tab-btn-ops">⚡ Thao Tác</button>
+    <button class="nav-tab" id="tab-btn-sniff">🎯 Bắt API (AI Sniffer) <span class="tab-badge" id="sniffer-badge">0</span></button>
+  </div>
+
+  <!-- Tab 1: Operations View -->
+  <div id="tab-view-ops" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
   <!-- Metrics -->
   <div class="metrics">
     <div class="metric-card">
@@ -566,6 +575,159 @@
     <button class="btn" id="btn-clear-log">Xóa Nhật Ký</button>
     <button class="btn" id="btn-reload-ext" title="Tải lại Extension">Tải lại Ext</button>
   </div>
+  </div>
+
+  <!-- Tab 2: Sniffer View -->
+  <div id="tab-view-sniff" class="sniffer-container" style="display: none;">
+    <!-- 1. Status & Injection Card -->
+    <div class="sniffer-card-box status-banner-card">
+      <div class="status-banner-top">
+        <div class="status-identity">
+          <div class="status-dot-ring">
+            <div class="status-dot pulse" id="hook-status-dot"></div>
+          </div>
+          <div class="status-info">
+            <div class="status-main-line">
+              <span class="status-main-title" id="hook-status-title">Kiểm tra kết nối tab...</span>
+            </div>
+            <div class="status-sub-line" id="hook-status-sub">Đang tìm kiếm tab Google Flow...</div>
+          </div>
+        </div>
+
+        <div class="status-banner-actions">
+          <button id="btn-fix-injection" class="btn-pill-action warning" style="display:none;" title="Tải lại tab Flow để nạp hook script mới">
+            🔄 Tải lại tab Flow
+          </button>
+          <button id="btn-open-flow" class="btn-pill-action primary" style="display:none;" title="Mở trang Google Flow mới">
+            🌐 Mở Flow
+          </button>
+          <button id="btn-refresh-status" class="btn-icon-refresh" title="Kiểm tra lại trạng thái tab Flow">
+            🔄
+          </button>
+        </div>
+      </div>
+
+      <div class="status-banner-divider"></div>
+
+      <div class="status-switch-row">
+        <div class="switch-desc">
+          <span class="switch-title">Bộ Bắt API Sniffer:</span>
+          <span class="switch-badge active" id="sniffer-status-text">ĐANG BẬT</span>
+        </div>
+        <label class="toggle toggle-modern">
+          <input type="checkbox" id="sniffer-active-toggle" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 2. Section: Preset & Title -->
+    <div class="sniffer-card-box">
+      <div class="box-header">
+        <span class="box-title">🏷️ Tiêu Đề Log & Mẫu Cấu Hình (Preset)</span>
+        <span class="box-badge-hint">Tự lưu cache</span>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="sniffer-title">Tiêu đề ghi nhớ đợt bắt API:</label>
+        <input type="text" id="sniffer-title" class="modern-input" placeholder="Ví dụ: Bắt API Veo3 Interpolate & Đổi tên..." />
+      </div>
+
+      <div class="field-group" style="margin-bottom: 2px;">
+        <label class="field-label" for="sniffer-preset-select">Mẫu cấu hình sẵn có:</label>
+        <div class="preset-action-bar">
+          <select id="sniffer-preset-select" class="modern-select"></select>
+          <button id="btn-save-preset" class="btn-action-sm success" title="Lưu cấu hình hiện tại thành mẫu mới">💾 Lưu Mẫu</button>
+          <button id="btn-delete-preset" class="btn-action-sm danger" title="Xóa mẫu đang chọn">🗑️ Xóa</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Section: Reason / AI Context -->
+    <div class="sniffer-card-box">
+      <div class="box-header">
+        <span class="box-title">🎯 Lý Do Lấy API (Ghi Chú Cho AI Hiểu)</span>
+      </div>
+      <textarea id="sniffer-reason" class="modern-textarea" placeholder="Nhập mục đích hoặc ngữ cảnh để AI hiểu (Ví dụ: Phân tích payload nối frame giữa 2 ảnh để bổ sung logic vào flowkit backend...)..."></textarea>
+    </div>
+
+    <!-- 4. Section: Pattern List & Descriptions -->
+    <div class="sniffer-card-box">
+      <div class="box-header">
+        <span class="box-title">🔍 Bộ Lọc URL & Mô Tả Chức Năng Từng API</span>
+        <button id="btn-add-pattern" class="btn-add-chip">➕ Thêm API Khác</button>
+      </div>
+
+      <div id="pattern-list" class="pattern-cards-stack"></div>
+
+      <!-- Quick Chips Suggestions -->
+      <div class="chips-panel">
+        <div class="chips-panel-label">💡 Nhấp để thêm nhanh API thường dùng:</div>
+        <div class="chips-row">
+          <span class="chip" data-pattern="batchexecute?rpcids=YhhmEf" data-desc="Tạo video Veo3 từ prompt (T2V Veo 3.1)">🎬 YhhmEf (Tạo video)</span>
+          <span class="chip" data-pattern="batchexecute?rpcids=jwpduf" data-desc="Kiểm tra trạng thái render video (Poll Video Status)">⏳ jwpduf (Trạng thái)</span>
+          <span class="chip" data-pattern="batchexecute?rpcids=nprQif" data-desc="Nối frame video (Start-End Frame Interpolate)">🎬 nprQif (Nối frame)</span>
+          <span class="chip" data-pattern="batchexecute?rpcids=eb1hJf" data-desc="Tạo video Veo3 từ 1 ảnh/prompt (I2V / T2V)">🎥 eb1hJf (Tạo video cũ)</span>
+          <span class="chip" data-pattern="batchexecute?rpcids=MZZa6b" data-desc="Tạo video từ ảnh tham chiếu (Reference-to-Video)">👤 MZZa6b (Video Ref)</span>
+          <span class="chip" data-pattern="batchexecute?rpcids=ogiZ0b" data-desc="Tạo ảnh từ text prompt (Image Generation)">🖼️ ogiZ0b (Tạo ảnh)</span>
+          <span class="chip" data-pattern="batchexecute?rpcids=jHPbke" data-desc="Tạo mới dự án trên Google Flow (Create Project)">📁 jHPbke (Tạo dự án)</span>
+          <span class="chip" data-pattern="batchexecute?rpcids=mYWVGd" data-desc="Đổi tên asset / media node (Rename Asset)">✏️ mYWVGd (Đổi tên)</span>
+          <span class="chip" data-pattern="batchAsyncGenerateVideo" data-desc="API tạo video Veo3 bất đồng bộ (REST)">⚡ batchAsyncVideo</span>
+          <span class="chip" data-pattern="uploadImage" data-desc="Tải ảnh lên hệ thống Flow (Upload Image)">⬆️ uploadImage</span>
+        </div>
+      </div>
+
+      <button id="btn-apply-config" class="btn-save-patterns">
+        💾 Áp Dụng & Lưu Bộ Lọc
+      </button>
+    </div>
+
+    <!-- 5. Actions Toolbar -->
+    <div class="sniffer-card-box actions-box">
+      <div class="actions-options-row">
+        <label class="compact-toggle-label" title="Tự động gộp các request polling lặp lại và ẩn payload/response trùng để tiết kiệm token khi gửi cho AI">
+          <input type="checkbox" id="chk-compact-report" checked>
+          <span>⚡ Tinh gọn trùng lặp</span>
+        </label>
+        <label class="compact-toggle-label" title="Tự động trích xuất các ID, Token, Blob lặp lại thành bảng biến tham chiếu chung ($PROJECT_ID, $OP_ID...) để giảm tối đa độ dài ký tự">
+          <input type="checkbox" id="chk-shared-refs" checked>
+          <span>🔗 Tham chiếu chung ($REF)</span>
+        </label>
+      </div>
+      <button id="btn-copy-ai-log" class="btn-copy-ai-main" title="Tổng hợp toàn bộ các API đã bắt, kèm lý do, cURL, payload và diff để gửi cho AI">
+        📋 SAO CHÉP BÁO CÁO CHO AI
+      </button>
+      <div class="actions-secondary-row">
+        <button id="btn-test-capture" class="btn-clear-log-main" style="color: #38bdf8; border-color: #38bdf866;" title="Gửi 1 request thử nghiệm trên trang Flow để kiểm tra hook">
+          🧪 Thử Nghiệm Bắt (Test)
+        </button>
+        <button id="btn-clear-sniffer" class="btn-clear-log-main" title="Xóa toàn bộ log API đã bắt">
+          🧹 Xóa Nhật Ký Bắt
+        </button>
+      </div>
+    </div>
+
+    <!-- 6. Captured Log List -->
+    <div class="log-section-header">
+      <div class="log-section-title">
+        <span>📡 Danh Sách API Đã Bắt (<span id="sniffer-count">0</span>)</span>
+      </div>
+      <div class="log-section-hint">Sắp xếp: Sớm nhất ➔ Muộn nhất (từ trên xuống)</div>
+    </div>
+
+    <div id="sniffer-log-items" class="sniffer-log-list">
+      <div class="sniffer-empty-box">
+        <div class="empty-icon">🎯</div>
+        <div class="empty-title">Chưa Bắt Được API Nào</div>
+        <div class="empty-desc">
+          1. Đảm bảo trạng thái Hook ở trên đang báo <strong>🟢 Đã Inject</strong>.<br>
+          2. Thao tác trên web Flow (tạo video, nối frame, v.v...).<br>
+          3. Các API khớp bộ lọc sẽ tự động xuất hiện tại đây.
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Signature -->
   <div class="signature">
@@ -585,5 +747,7 @@
   </div>
 
   <script src="side_panel.js"></script>
+  <script src="sniffer_core.js"></script>
+  <script src="sniffer_ui.js"></script>
 </body>
 </html>
