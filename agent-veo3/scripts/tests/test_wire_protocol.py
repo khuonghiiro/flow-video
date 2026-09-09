@@ -136,7 +136,7 @@ def test_model_resolvers():
         ("T2V 8s", vb.resolve_t2v_model(8), "veo_3_1_t2v_lite_low_priority"),
         ("F2F 4s", vb.resolve_f2f_model(4), "veo_3_1_i2v_s_lite_4s_fl_low_priority"),
         ("F2F 6s", vb.resolve_f2f_model(6), "veo_3_1_i2v_s_lite_6s_fl_low_priority"),
-        ("F2F 8s", vb.resolve_f2f_model(8), "veo_3_1_interpolation_lite_low_priority"),
+        ("F2F 8s", vb.resolve_f2f_model(8), "veo_3_1_i2v_s_lite_8s_fl_low_priority"),
         ("R2V default", vb.resolve_r2v_model(), "veo_3_1_r2v_lite_low_priority"),
         ("R2V ultra", vb.resolve_r2v_model("ultra"), "veo_3_1_r2v_fast_ultra"),
     ]

@@ -11,7 +11,7 @@ Usage: `/fk-gen-chain-videos <project_id> <video_id>`
 **FIXED:** The `nprQif` RPC endpoint has been captured and implemented. Frame-to-Frame video generation (start + end image) now works via `build_interpolation_request()` in `extension_patcher.py`.
 
 - **RPC:** `nprQif`
-- **Duration:** 4s (`veo_3_1_i2v_s_lite_4s_fl_low_priority`), 6s (`veo_3_1_i2v_s_lite_6s_fl_low_priority`), 8s (`veo_3_1_interpolation_lite_low_priority`)
+- **Duration:** 8s (`veo_3_1_interpolation_lite_low_priority` or ultra variant). Veo 3.1 interpolation wire model natively generates 8s video.
 - **Count:** x1-x4 parallel generations
 - **Requires:** Both `start_image_media_id` AND `end_image_media_id`
 
