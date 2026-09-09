@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger("extension_patcher")
 
@@ -134,6 +134,7 @@ def patch_flow_client():
             resolve_video_model_key,
         )
         from agent import config
+        from agent.services import flow_batch as fb
 
         orig_generate_video = FlowClient.generate_video
 
@@ -148,23 +149,28 @@ def patch_flow_client():
             if isinstance(key, str):
                 if key in INTERPOLATION_MODELS:
                     return key
-                if "ultra" in key:
+                k = key.lower()
+                if "ultra" in k:
                     return "veo_3_1_interpolation_fast_ultra"
-                if "low_priority" in key:
+                if "lite_low_priority" in k or "low_priority" in k:
                     return "veo_3_1_interpolation_lite_low_priority"
-                if "lite" in key:
+                if "lite" in k:
                     return "veo_3_1_interpolation_lite"
             return "veo_3_1_interpolation_lite_low_priority"
 
         def build_interpolation_request(
             prompt: str,
             project_id: str,
-            start_image_media_id: str,
-            end_image_media_id: str,
+            start_media_id: str = "",
+            end_media_id: str = "",
             crop: Optional[list] = None,
             aspect: Any = None,
             model: str = "veo_3_1_interpolation_lite_low_priority",
+            start_image_media_id: str = "",
+            end_image_media_id: str = "",
         ) -> str:
+            start_id = start_media_id or start_image_media_id
+            end_id = end_media_id or end_image_media_id
             crop_val = [None, None, 1, 1] if crop is None else crop
             asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
             inner = [
@@ -172,29 +178,93 @@ def patch_flow_client():
                   resolve_interp_model(model),
                   asp_val,
                   None,
-                  [None, start_image_media_id, None, None, None, crop_val],
-                  [None, end_image_media_id, None, None, None, crop_val],
+                  [None, start_id, None, None, None, crop_val],
+                  [None, end_id, None, None, None, crop_val],
                   [None, None, None, None, fb._client_uuid(), fb._client_uuid()]]],
                 fb._context(project_id),
                 [fb._client_uuid(), 1],
             ]
             return fb.build_envelope(RPC_GEN_INTERPOLATION, inner)
 
-        def extract_interpolation_media_id(payload: Any) -> Optional[str]:
-            try:
-                if isinstance(payload, list) and len(payload) > 3 and isinstance(payload[3], list):
-                    for row in payload[3]:
-                        if isinstance(row, list) and len(row) > 0 and isinstance(row[0], str) and len(row[0]) == 36:
-                            return row[0]
-                if isinstance(payload, list) and len(payload) > 2 and isinstance(payload[2], list):
-                    rec = payload[2][0]
-                    if isinstance(rec, list) and len(rec) > 3 and isinstance(rec[3], list) and len(rec[3]) > 4:
-                        mid = rec[3][4]
-                        if isinstance(mid, str) and len(mid) == 36:
-                            return mid
-            except Exception:
-                pass
-            return None
+        # Ensure flow_batch has interpolation capabilities exposed
+        fb.RPC_GEN_INTERPOLATION = RPC_GEN_INTERPOLATION
+        fb.interpolation_request = build_interpolation_request
+        fb.resolve_interp_model = resolve_interp_model
+
+        RPC_GEN_VIDEO_REFS = "MZZa6b"
+        R2V_MODELS = {
+            "veo_3_1_r2v_lite_low_priority",
+            "veo_3_1_r2v_lite",
+            "veo_3_1_r2v_fast_ultra",
+        }
+
+        def resolve_r2v_model(key: Any) -> str:
+            if isinstance(key, str):
+                if key in R2V_MODELS:
+                    return key
+                k = key.lower()
+                if "ultra" in k:
+                    return "veo_3_1_r2v_fast_ultra"
+                if "lite_low_priority" in k or "low_priority" in k:
+                    return "veo_3_1_r2v_lite_low_priority"
+                if "lite" in k:
+                    return "veo_3_1_r2v_lite"
+            return "veo_3_1_r2v_lite_low_priority"
+
+        def build_r2v_request(
+            prompt: str,
+            project_id: str,
+            reference_media_ids: Optional[list] = None,
+            aspect: Any = None,
+            model: str = "veo_3_1_r2v_lite_low_priority",
+        ) -> str:
+            """Build Reference-to-Video (or Text-to-Video) request envelope (RPC: MZZa6b).
+            Supports 0 to 3 reference images.
+            """
+            refs = reference_media_ids or []
+            ref_list = [[None, mid] for mid in refs[:3] if mid]
+            asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
+            inner = [
+                [[[None, None, [[[prompt]]]],
+                  ref_list,
+                  resolve_r2v_model(model),
+                  asp_val,
+                  None,
+                  [None, None, None, None, fb._client_uuid(), fb._client_uuid()]]],
+                fb._context(project_id),
+                [fb._client_uuid(), 1],
+            ]
+            return fb.build_envelope(RPC_GEN_VIDEO_REFS, inner)
+
+        fb.RPC_GEN_VIDEO_REFS = RPC_GEN_VIDEO_REFS
+        fb.r2v_request = build_r2v_request
+        fb.resolve_r2v_model = resolve_r2v_model
+
+        orig_read_operation = fb.read_operation
+
+        def enhanced_read_operation(payload: Any) -> fb.Operation:
+            records = None
+            if isinstance(payload, list):
+                # Check payload[3] first (used by nprQif interpolation)
+                if len(payload) > 3 and isinstance(payload[3], list) and payload[3]:
+                    cand = payload[3][0]
+                    if isinstance(cand, list) and len(cand) >= 4 and isinstance(cand[3], str):
+                        records = payload[3]
+                # Check payload[2] (used by eb1hJf, jwpduf, etc.)
+                if not records and len(payload) > 2 and isinstance(payload[2], list) and payload[2]:
+                    records = payload[2]
+
+            record = records[0] if isinstance(records, list) and records else None
+            if not isinstance(record, list) or not record:
+                raise fb.FlowBatchError("operation payload carried no record")
+            return fb.Operation(
+                operation_id=record[0],
+                project_id=record[1] if len(record) > 1 else None,
+                status=record[3] if len(record) > 3 and isinstance(record[3], str) else None,
+                error=fb.read_operation_error(record),
+            )
+
+        fb.read_operation = enhanced_read_operation
 
         async def enhanced_generate_video(
             self,
@@ -221,8 +291,8 @@ def patch_flow_client():
 
                 if end_image_media_id:
                     batch_model = resolve_interp_model(
-                        "veo_3_1_interpolation_lite_low_priority" if "low_priority" in str(user_paygate_tier).lower()
-                        else "veo_3_1_interpolation_lite"
+                        "veo_3_1_interpolation_fast_ultra" if "ultra" in str(user_paygate_tier).lower()
+                        else "veo_3_1_interpolation_lite_low_priority"
                     )
                     logger.info(
                         "[VEO3 BATCH INTERPOLATION DISPATCH] model=%s aspect=%s start=%s end=%s",
@@ -238,15 +308,12 @@ def patch_flow_client():
                         )
                         logger.info("[VEO3 NPRQIF RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
                         operation = fb.read_operation(payload)
-                        mid = extract_interpolation_media_id(payload)
-                        if mid:
-                            self._operation_media[operation.operation_id] = mid
                     except Exception as e:
                         return _batch_error(e)
-                else:
+                elif start_image_media_id:
                     batch_model = self._batch_video_model(user_paygate_tier, gen_type, aspect_ratio)
                     logger.info(
-                        "[VEO3 BATCH DISPATCH] gen_type=%s model=%s aspect=%s duration=%s",
+                        "[VEO3 BATCH I2V DISPATCH] gen_type=%s model=%s aspect=%s duration=%s",
                         gen_type, batch_model, aspect_ratio, duration
                     )
                     try:
@@ -258,11 +325,19 @@ def patch_flow_client():
                             fb.RPC_GEN_VIDEO, freq, fb.CAPTCHA_VIDEO, timeout=120
                         )
                         operation = fb.read_operation(payload)
-                        mid = extract_interpolation_media_id(payload)
-                        if mid:
-                            self._operation_media[operation.operation_id] = mid
                     except Exception as e:
                         return _batch_error(e)
+                else:
+                    # 3. Text-to-Video (0 images) via MZZa6b with empty reference list
+                    logger.info("[VEO3 BATCH T2V DISPATCH] 0 images -> routing to R2V empty reference list (MZZa6b)")
+                    return await self.generate_video_from_references(
+                        reference_media_ids=[],
+                        prompt=prompt,
+                        project_id=pid,
+                        scene_id=scene_id,
+                        aspect_ratio=aspect_ratio,
+                        user_paygate_tier=user_paygate_tier,
+                    )
 
                 self._remember_operation(operation.operation_id, pid)
                 return {"status": 200, "data": {"operations": [_as_pending_operation(operation.operation_id)]}}
@@ -318,7 +393,56 @@ def patch_flow_client():
                 "captchaAction": "VIDEO_GENERATION",
             }, timeout=60)
 
+        orig_generate_video_from_references = FlowClient.generate_video_from_references
+
+        async def enhanced_generate_video_from_references(
+            self,
+            reference_media_ids: list[str],
+            prompt: str,
+            project_id: str,
+            scene_id: str,
+            aspect_ratio: str = "VIDEO_ASPECT_RATIO_PORTRAIT",
+            user_paygate_tier: str = "PAYGATE_TIER_TWO",
+            **kwargs,
+        ) -> dict:
+            from agent.config import USE_BATCH_RPC
+            from agent.services import flow_batch as fb
+            from agent.services.flow_client import _as_pending_operation, _batch_error
+
+            if USE_BATCH_RPC:
+                pid = self._batch_project_id(project_id)
+                batch_model = resolve_r2v_model(
+                    "veo_3_1_r2v_fast_ultra" if "ultra" in str(user_paygate_tier).lower()
+                    else "veo_3_1_r2v_lite_low_priority"
+                )
+                logger.info(
+                    "[VEO3 BATCH R2V DISPATCH] RPC=%s model=%s aspect=%s refs_count=%d",
+                    RPC_GEN_VIDEO_REFS, batch_model, aspect_ratio, len(reference_media_ids or [])
+                )
+                try:
+                    freq = build_r2v_request(
+                        prompt=prompt,
+                        project_id=pid,
+                        reference_media_ids=reference_media_ids or [],
+                        aspect=aspect_ratio,
+                        model=batch_model,
+                    )
+                    payload = await self._batch_payload(
+                        RPC_GEN_VIDEO_REFS, freq, fb.CAPTCHA_VIDEO, timeout=120
+                    )
+                    logger.info("[VEO3 MZZa6b RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
+                    operation = fb.read_operation(payload)
+                    self._remember_operation(operation.operation_id, pid)
+                    return {"status": 200, "data": {"operations": [_as_pending_operation(operation.operation_id)]}}
+                except Exception as e:
+                    return _batch_error(e)
+
+            return await orig_generate_video_from_references(
+                self, reference_media_ids, prompt, project_id, scene_id, aspect_ratio, user_paygate_tier
+            )
+
         FlowClient.generate_video = enhanced_generate_video
+        FlowClient.generate_video_from_references = enhanced_generate_video_from_references
 
         # Add helper methods to FlowClient
         if not hasattr(FlowClient, "notify_request_status"):
@@ -359,6 +483,42 @@ def patch_flow_client():
                 res = await self._send("get_captured_video_urls", {}, timeout=10)
                 return res.get("result", []) if isinstance(res, dict) else []
             FlowClient.get_captured_video_urls = get_captured_video_urls
+
+        orig_poll_batch_operation = FlowClient._poll_batch_operation
+
+        async def enhanced_poll_batch_operation(self, operation_id: str) -> dict:
+            res = await orig_poll_batch_operation(self, operation_id)
+            if res.get("status") == "MEDIA_GENERATION_STATUS_SUCCESSFUL":
+                return res
+
+            # Fallback: check extension TRPC captured video URLs
+            try:
+                captured = await self.get_captured_video_urls()
+                target_ids = {operation_id}
+                mid = self._operation_media.get(operation_id)
+                if mid:
+                    target_ids.add(mid)
+
+                for item in captured:
+                    curl = item.get("url", "")
+                    cmid = item.get("mediaId", "")
+                    if (cmid and cmid in target_ids) or any(tid in curl for tid in target_ids):
+                        if "/video/" in curl:
+                            matched_mid = cmid or mid or operation_id
+                            self._operation_media[operation_id] = matched_mid
+                            return {
+                                "operation": {
+                                    "name": operation_id,
+                                    "metadata": {"video": {"mediaId": matched_mid, "fifeUrl": curl}},
+                                },
+                                "status": "MEDIA_GENERATION_STATUS_SUCCESSFUL",
+                            }
+            except Exception as cap_err:
+                logger.debug("Captured URLs fallback check: %s", cap_err)
+
+            return res
+
+        FlowClient._poll_batch_operation = enhanced_poll_batch_operation
 
         # ─── Batch RPC project creation (jHPbke) & renaming (o8DA4) ───
         orig_create_project = FlowClient.create_project

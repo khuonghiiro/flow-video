@@ -24,6 +24,7 @@ const TYPE_LABELS = {
 
   // Video
   GEN_VID:                    'Tạo video',
+  GEN_VID_INTERPOLATE:        'Nối frame video',
   GENERATE_VIDEO:             'Tạo video',
   VIDEO_GENERATION:           'Tạo video',
   GEN_VID_REF:                'Tạo video ref',
@@ -54,6 +55,10 @@ const TYPE_LABELS = {
   'ogiZ0b':                   'Tạo ảnh',
   'RPC:eb1hJf':               'Tạo video',
   'eb1hJf':                   'Tạo video',
+  'RPC:nprQif':               'Nối frame video',
+  'nprQif':                   'Nối frame video',
+  'RPC:MZZa6b':               'Tạo video ref',
+  'MZZa6b':                   'Tạo video ref',
   'RPC:maseQ':                'Up ảnh',
   'maseQ':                    'Up ảnh',
   'RPC:mYWVGd':               'Đổi tên',
@@ -83,6 +88,8 @@ function formatType(type, entry = null) {
   if (url.includes('uploadImage') || stripped === 'maseQ') return 'Up ảnh';
   if (url.includes('batchGenerateImages') || stripped === 'ogiZ0b') return 'Tạo ảnh';
   if (url.includes('batchAsyncGenerateVideo') || stripped === 'eb1hJf') return 'Tạo video';
+  if (stripped === 'nprQif') return 'Nối frame video';
+  if (stripped === 'MZZa6b') return 'Tạo video ref';
   if (url.includes('ReferenceImages')) return 'Tạo video ref';
   if (url.includes('UpsampleVideo')) return 'Nâng cấp video';
   if (url.includes('createProject') || stripped === 'jHPbke') return 'Tạo dự án';

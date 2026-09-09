@@ -5,6 +5,7 @@ __pycache__/
 *.db-wal
 *.db-journal
 .env
+.venv
 # Output directory: ignore media files, but keep metadata for AI and project tracking
 output/**
 !output/**/

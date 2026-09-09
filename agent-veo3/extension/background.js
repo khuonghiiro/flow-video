@@ -26,7 +26,7 @@ let metrics = {
 
 // Visible log types — only these appear in the request log
 const _VISIBLE_TYPES = new Set([
-  'GEN_IMG', 'GEN_VID', 'GEN_VID_REF', 'UPLOAD', 'FETCH_BLOB',
+  'GEN_IMG', 'GEN_VID', 'GEN_VID_INTERPOLATE', 'GEN_VID_REF', 'UPLOAD', 'FETCH_BLOB',
   'UPSCALE', 'CREATE_PROJECT', 'RENAME', 'RENAME_ASSET', 'RENAME_PROJECT',
   'TRACKING', 'URL_REFRESH'
 ]);
@@ -35,6 +35,7 @@ function _classifyRpc(rpcid) {
   if (rpcid === 'ogiZ0b') return 'GEN_IMG';
   if (rpcid === 'eb1hJf') return 'GEN_VID';
   if (rpcid === 'nprQif') return 'GEN_VID_INTERPOLATE';
+  if (rpcid === 'MZZa6b') return 'GEN_VID_REF';
   if (rpcid === 'maseQ')  return 'UPLOAD';
   if (rpcid === 'mYWVGd') return 'RENAME';
   if (rpcid === 'jHPbke') return 'CREATE_PROJECT';
