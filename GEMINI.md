@@ -37,6 +37,7 @@ flow-video/
 3. **Batch Requests**: Always submit through `POST /api/requests/batch`, server enforces 5 concurrent requests & 10s cooldown.
 4. **Code Limits**: Target 150-500 lines per file, strictly under 800-1000 lines max. Methods under 50-80 lines.
 5. **Non-invasive Patching**: Keep `flowkit/` core intact; apply Veo3 features via `agent-veo3/agent/extension_patcher.py`.
+6. **Skill Override Hierarchy (OOP Inheritance)**: Always prioritize skills in `agent-veo3/skills/` over `flowkit/skills/`. If a skill exists in both, `agent-veo3/skills/` overrides `flowkit/skills/` completely. Reference `agent-veo3/skills_vi/` for Vietnamese guide.
 
 ## Documentation & References
 
