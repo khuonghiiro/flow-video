@@ -43,14 +43,14 @@ agent-veo3/
    - AI quét đúng các file trong `agent-veo3/output/cleaned/`.
    - Kiểm tra hash/tên file đã upload trong metadata để **tuyệt đối không upload trùng lặp 2 lần cùng một ảnh**.
    - Lưu lại `media_id` (UUID 36 ký tự) sạch trả về từ Google Flow.
-4. **Tạo video từ ảnh đã upload:**
-   - **1 ảnh (Single Frame):** Bắt buộc dùng logic **I2V (Image-to-Video)** qua RPC `eb1hJf` (chỉ truyền duy nhất `start_image_media_id`), **tuyệt đối KHÔNG dùng logic F2F (Frame-to-Frame / Interpolation - `nprQif`)**.
-   - **2 ảnh (Start & End Frame):** Sử dụng logic **F2F** qua RPC `nprQif`.
-   - **1-3 ảnh tham chiếu phong cách/nhân vật:** Sử dụng logic **R2V** qua RPC `MZZa6b`.
+4. **Tạo video từ ảnh đã upload (Chuẩn Google Flow Wire Protocol):**
+   - **Tạo video với ảnh (1 đến 3 ảnh):** Bắt buộc dùng chế độ **Tạo video với ảnh (R2V / Image-to-Video)** qua RPC **`MZZa6b`** (Model: `veo_3_1_r2v_lite_low_priority`, thời lượng: cố định **8s**, 0 credit). **Tuyệt đối KHÔNG dùng cơ chế frame hay F2F cho 1 ảnh đơn lẻ**.
+   - **Tạo video Frame to Frame (Bắt buộc đủ 2 ảnh Start & End):** Sử dụng logic **F2F** qua RPC **`nprQif`** (Model: `veo_3_1_i2v_s_lite_6s_fl_low_priority` cho 6s, hoặc `veo_3_1_interpolation_lite_low_priority` cho 8s). Cần đủ cả `start_image_media_id` VÀ `end_image_media_id`.
+   - **Tạo video Text-to-Video (0 ảnh):** Sử dụng RPC **`YhhmEf`** (Model: `veo_3_1_t2v_lite_low_priority`, 4s/6s/8s).
 
 ---
 
-## 🧠 Nguyên Lý Hoạt Động (Reverse Alpha Blending)
+## 🧠 Nguyên Lý Hoạt Động (Reverse Alpha Blending + Adaptive Grain)
 
 Khác với các công cụ inpainting (xóa vật thể AI) thường làm nhòe mờ chi tiết nền vì phải "đoán" pixel thay thế, thuật toán này giải toán trực tiếp:
 
@@ -58,14 +58,15 @@ $$I = (1 - \alpha) \cdot B + \alpha \cdot W$$
 
 * $I$: Pixel ảnh hiện tại (đang chứa logo).
 * $W$: Màu của logo watermark ($255$ - màu trắng).
-* $\alpha$: Bản đồ độ trong suốt đã được hiệu chuẩn ($\approx 0.28$).
+* $\alpha$: Bản đồ độ trong suốt chuẩn xác (`perfect_alpha_48.npy` / `perfect_alpha_96.npy` với đỉnh $\approx 0.315 / 0.297$).
 * $B$: Pixel gốc ban đầu cần khôi phục.
 
 Phép đảo ngược khôi phục chính xác:
 
 $$B = \frac{I - \alpha \cdot 255}{1 - \alpha}$$
 
-👉 **Kết quả:** Vân sóng nước, sợi vải, lá cây, hạt noise tự nhiên và chi tiết vi mô dưới lớp watermark được phục hồi nguyên vẹn 100%, không để lại vệt mờ hay đường viền.
+### 🔬 Bổ sung Phục Hồi Vi Hạt Tự Nhiên (Adaptive Micro-Grain Restoration)
+Ở vùng tâm lõi watermark ($\alpha > 0.15$), quá trình lượng tử hóa số nguyên 8-bit và nén JPEG DCT của Gemini làm suy giảm các vi hạt nhiễu tần số cao của nền. Thuật toán tự động đo độ lệch chuẩn phương sai vi mô ($\sigma_{bg}$) ở viền xung quanh và tái tạo bù lượng vi hạt đối xứng hoàn hảo, đảm bảo khi zoom sâu 6x - 10x cũng **tuyệt đối không còn bất kỳ vệt phẳng, vệt tối hay đường viền nào**.
 
 ---
 

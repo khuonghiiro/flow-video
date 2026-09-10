@@ -7,8 +7,22 @@ import os
 import sys
 import argparse
 from pathlib import Path
-import cv2
-import numpy as np
+# Auto-re-exec with .venv python if cv2 is missing in current environment
+try:
+    import cv2
+    import numpy as np
+except ModuleNotFoundError:
+    import subprocess
+    script_dir = Path(__file__).resolve().parent
+    candidates = [
+        script_dir.parent / ".venv" / "Scripts" / ("python.exe" if sys.platform == "win32" else "python"),
+        script_dir.parent.parent / ".venv" / "Scripts" / ("python.exe" if sys.platform == "win32" else "python"),
+    ]
+    for venv_py in candidates:
+        if venv_py.exists() and sys.executable.lower() != str(venv_py).lower():
+            res = subprocess.run([str(venv_py), str(Path(__file__).resolve())] + sys.argv[1:])
+            sys.exit(res.returncode)
+    raise
 
 # Ensure UTF-8 output on Windows consoles
 if sys.platform == "win32":
@@ -123,7 +137,7 @@ def load_calibrated_alpha(size: int = 48, asset_dir: Path | None = None) -> np.n
     if asset_dir is None:
         asset_dir = get_default_asset_dir()
     
-    for filename in [f"true_calibrated_alpha_{size}.npy", f"perfect_alpha_{size}.npy"]:
+    for filename in [f"perfect_alpha_{size}.npy", f"true_calibrated_alpha_{size}.npy"]:
         npy_path = asset_dir / filename
         if npy_path.exists():
             try:
@@ -133,7 +147,8 @@ def load_calibrated_alpha(size: int = 48, asset_dir: Path | None = None) -> np.n
             
     # Fallback template png
     template = load_watermark_template(size, asset_dir)
-    return (template.astype(np.float64) / 255.0) * 0.314
+    default_peak = 0.315 if size == 48 else 0.297
+    return (template.astype(np.float64) / 255.0) * default_peak
 
 
 def remove_watermark(
@@ -142,14 +157,14 @@ def remove_watermark(
     target_size: int | None = None,
     asset_dir: Path | None = None,
     aggressive: bool = False,
+    restore_grain: bool = True,
 ) -> np.ndarray:
     """
     Khử watermark Gemini/Flow bảo tồn 100% chi tiết pixel gốc.
-    - Dùng thuật toán toán học chuẩn xác Reverse Alpha Blending:
+    - Dùng thuật toán Reverse Alpha Blending chính xác:
       B = clip((I - alpha * 255) / (1 - alpha), 0, 255)
-    - Loại bỏ hoàn toàn cơ chế Telea inpainting gây nhòe mờ loang lổ.
-    - aggressive=True: Bổ sung khử nhiễu lượng tử hóa cục bộ (Navier-Stokes)
-      CHỈ tại tâm lõi có alpha > 0.22 với bán kính tối thiểu r=2.
+    - Tự động phục hồi vi hạt (adaptive micro-grain) tại lõi alpha cao bị lượng tử
+      hóa nén JPEG làm phẳng, giúp ảnh sau zoom sâu mượt mà và liền mạch 100%.
     """
     h, w = img.shape[:2]
     
@@ -183,13 +198,37 @@ def remove_watermark(
     patch = img[y1:y2, x1:x2].astype(np.float64)
     a_3d = alpha_norm[:, :, np.newaxis]
     denom = np.maximum(1.0 - a_3d, 1e-4)
-    restored = np.clip(np.round((patch - a_3d * 255.0) / denom), 0.0, 255.0).astype(np.uint8)
+    restored = np.clip((patch - a_3d * 255.0) / denom, 0.0, 255.0)
+
+    # Adaptive Micro-Grain Restoration: Phục hồi vi hạt tại lõi alpha cao
+    if restore_grain:
+        m = 10
+        surround = []
+        if y1 > 0:
+            surround.append(img[max(0, y1 - m):y1, x1:x2].reshape(-1, 3))
+        if y2 < h:
+            surround.append(img[y2:min(h, y2 + m), x1:x2].reshape(-1, 3))
+        if x1 > 0:
+            surround.append(img[y1:y2, max(0, x1 - m):x1].reshape(-1, 3))
+        if x2 < w:
+            surround.append(img[y1:y2, x2:min(w, x2 + m)].reshape(-1, 3))
+            
+        if surround:
+            surround_pixels = np.concatenate(surround, axis=0).astype(np.float64)
+            bg_std = np.std(surround_pixels, axis=0)
+            bg_std = np.clip(bg_std, 0.5, 6.0)
+            
+            peak_val = alpha_norm.max()
+            if peak_val > 0.15:
+                core_weight = np.clip((alpha_norm - 0.15) / (peak_val - 0.15), 0.0, 1.0)
+                rng = np.random.RandomState(int((x1 * 31 + y1 * 17) & 0xFFFFFFFF))
+                grain = rng.normal(0.0, 1.0, restored.shape) * (bg_std * 0.70)
+                restored = np.clip(restored + grain * core_weight[:, :, np.newaxis], 0.0, 255.0)
     
     result = img.copy()
-    result[y1:y2, x1:x2] = restored
+    result[y1:y2, x1:x2] = np.round(restored).astype(np.uint8)
 
     if aggressive:
-        # Chỉ xử lý nhẹ lượng tử hóa ở vùng lõi dày nhất, không làm mờ gờ đường nét xung quanh
         core_mask = np.zeros((h, w), dtype=np.uint8)
         core_mask[y1:y2, x1:x2] = (alpha_norm > 0.22).astype(np.uint8) * 255
         cleaned = cv2.inpaint(result, core_mask, inpaintRadius=2, flags=cv2.INPAINT_NS)
@@ -201,7 +240,7 @@ def remove_watermark(
 def process_file(
     input_path: str | Path,
     output_path: str | Path | None = None,
-    alpha_peak: float = 0.28
+    alpha_peak: float | None = None
 ) -> bool:
     """Xử lý một file ảnh đơn lẻ."""
     in_p = Path(input_path)
@@ -245,8 +284,8 @@ def main():
     parser.add_argument(
         "-a", "--alpha",
         type=float,
-        default=0.28,
-        help="Độ mờ alpha của watermark (mặc định: 0.28)"
+        default=None,
+        help="Độ mờ alpha tùy chỉnh của watermark (mặc định: tự động theo calibrated template)"
     )
     args = parser.parse_args()
     

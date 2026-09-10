@@ -29,3 +29,4 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 archive_upstream_copies/
+scripts/tests/

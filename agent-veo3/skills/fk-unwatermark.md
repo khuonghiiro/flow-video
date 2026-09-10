@@ -30,10 +30,9 @@ agent-veo3/
 1. **Raw Downloads:** Always save downloaded images containing watermarks into `agent-veo3/output/watermarks/`.
 2. **Cleaned Output:** Always output unwatermarked images to `agent-veo3/output/cleaned/`.
 3. **Flow Upload:** AI scans `agent-veo3/output/cleaned/` and tracks uploaded UUIDs to **never upload duplicate images**.
-4. **Video Generation Dispatch:**
-   - **Single Frame (1 Image):** Strictly use **I2V (Image-to-Video)** via RPC `eb1hJf` (only pass `start_image_media_id`). **Never use Frame-to-Frame (`nprQif`) for single-frame generation.**
-   - **Start & End Frame (2 Images):** Use **F2F** interpolation via RPC `nprQif`.
-   - **Reference Images (1-3 Images):** Use **R2V** via RPC `MZZa6b`.
+4. **Video Generation Dispatch (Google Flow Wire Standards):**
+   - **Tạo video với ảnh (1-3 Images):** Strictly use **R2V / Image-to-Video** via RPC **`MZZa6b`** (model: `veo_3_1_r2v_lite_low_priority`, duration: 8s fixed). Pass `reference_media_ids` or `start_image_media_id`. **Never use Frame-to-Frame (`nprQif`) or single-frame structures for 1 image.**
+   - **Tạo video từ Frame to Frame (Bắt buộc đủ 2 Images):** Use **F2F** interpolation via RPC **`nprQif`** (model: `veo_3_1_i2v_s_lite_6s_fl_low_priority` for 6s, or `veo_3_1_interpolation_lite_low_priority` for 8s). Both `start_image_media_id` AND `end_image_media_id` are required.
 
 ---
 

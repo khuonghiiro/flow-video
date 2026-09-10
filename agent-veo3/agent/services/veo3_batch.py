@@ -60,6 +60,15 @@ F2F_MODELS = {
     "veo_3_1_interpolation_lite_low_priority",
     "veo_3_1_interpolation_lite",
     "veo_3_1_interpolation_fast_ultra",
+    "veo_3_1_i2v_s_lite_4s_fl_low_priority",
+    "veo_3_1_i2v_s_lite_6s_fl_low_priority",
+    "veo_3_1_i2v_s_lite_8s_fl_low_priority",
+}
+
+F2F_DURATION_MAP = {
+    4: "veo_3_1_i2v_s_lite_4s_fl_low_priority",
+    6: "veo_3_1_i2v_s_lite_6s_fl_low_priority",
+    8: "veo_3_1_interpolation_lite_low_priority",
 }
 
 F2F_DEFAULT = "veo_3_1_interpolation_lite_low_priority"
@@ -69,9 +78,10 @@ def resolve_f2f_model(key_or_duration: Any = 8, tier: str = "") -> str:
     """Pick the accepted wire F2F model key for Veo 3.1 Lite Lower Priority (0 credits).
 
     Matches Google Flow batchexecute nprQif wire traffic:
-    - Default (0 credits / low priority): ``veo_3_1_interpolation_lite_low_priority``
-    - Ultra: ``veo_3_1_interpolation_fast_ultra``
-    - Standard Lite: ``veo_3_1_interpolation_lite``
+    - 4s: veo_3_1_i2v_s_lite_4s_fl_low_priority
+    - 6s: veo_3_1_i2v_s_lite_6s_fl_low_priority (as in 'tạo video với frame to frame - ngang.txt')
+    - 8s: veo_3_1_interpolation_lite_low_priority (as in 'tạo video với frame to frame - dọc.txt')
+    - Ultra: veo_3_1_interpolation_fast_ultra
     """
     if "ultra" in str(tier).lower() or (isinstance(key_or_duration, str) and "ultra" in key_or_duration.lower()):
         return "veo_3_1_interpolation_fast_ultra"
@@ -81,8 +91,16 @@ def resolve_f2f_model(key_or_duration: Any = 8, tier: str = "") -> str:
         k = key_or_duration.lower()
         if "ultra" in k:
             return "veo_3_1_interpolation_fast_ultra"
+        if "6s" in k:
+            return "veo_3_1_i2v_s_lite_6s_fl_low_priority"
+        if "4s" in k:
+            return "veo_3_1_i2v_s_lite_4s_fl_low_priority"
         if "lite" in k or "low_priority" in k or "lower" in k:
             return F2F_DEFAULT
+    if isinstance(key_or_duration, (int, float)):
+        dur = int(key_or_duration)
+        if dur in F2F_DURATION_MAP:
+            return F2F_DURATION_MAP[dur]
     return F2F_DEFAULT
 
 
