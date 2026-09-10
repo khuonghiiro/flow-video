@@ -58,31 +58,39 @@ python agent-veo3/scripts/remove_gemini_watermark.py "<PATH>"
 
 ### Examples
 
-1. **Clean single image:**
+1. **Default Mode (Lossless Reverse Alpha Blending + Adaptive Grain, 6ms):**
 ```bash
 python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/sample.jpeg"
 ```
 
-2. **Clean single image with custom output:**
+2. **AI Inpainting Mode (LaMa Deep Learning on GPU/CPU):**
+```bash
+python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/sample.jpeg" -e lama
+```
+
+3. **Clean single image with custom output:**
 ```bash
 python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/sample.jpeg" -o "agent-veo3/output/sample_clean.jpeg"
 ```
 
-3. **Batch clean all images in folder:**
+4. **Batch clean all images in folder:**
 ```bash
 python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output"
 ```
 
-4. **Run test verification script:**
-```bash
-python agent-veo3/scripts/tests/test_e2e_generate_and_unwatermark.py
-```
-
 ---
 
-## How It Works
+## LaMa AI Model Setup (Optional for `-e lama`)
 
-1. **Auto-Detection:** Automatically scans the bottom-right region using template cross-correlation with calibrated `bg_48.png` / `bg_96.png` assets located in `agent-veo3/assets/watermarks/`.
-2. **Reverse Alpha Blending:** Reconstructs the exact background pixel value $B = \frac{I - \alpha \cdot 255}{1 - \alpha}$.
-3. **100% Detail Preservation:** Zero blur or AI approximation. Every underlying pixel, micro-grain, and sharp edge remains intact.
-4. **Ultra-Fast Speed:** ~6.6ms algorithm time per image (> 150 FPS), ~35ms including disk I/O.
+The default **Reverse Alpha** engine requires no model downloads and is 100% operational immediately.
+
+To enable the deep learning LaMa inpainting engine (`-e lama`):
+1. **Download Model File (~198MB):**
+   - **HuggingFace:** [lama_fp32.onnx (208 MB)](https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx?download=true)
+   - **GitHub Releases:** [big-lama.onnx (208 MB)](https://github.com/xulihang/ImageTrans_plugins/releases/download/plugins/big-lama.onnx)
+2. **Place in assets directory:**
+   ```
+   agent-veo3/assets/models/lama_fp32.onnx
+   ```
+   *(Accepts either `lama_fp32.onnx` or `big-lama.onnx`)*.
+3. **Hardware Acceleration:** Auto-selects NVIDIA CUDA GPU, DirectX 12 GPU (DirectML), or CPU.

@@ -70,9 +70,14 @@ The primary script is located at:
 
 Run from the repository root:
 
-### Process a Single Image:
+### Process a Single Image (Default: Reverse Alpha, 6ms):
 ```bash
 python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/image.jpeg"
+```
+
+### Process with Deep AI LaMa Inpainting Engine:
+```bash
+python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/image.jpeg" -e lama
 ```
 
 ### Process with Custom Output Path:
@@ -85,10 +90,11 @@ python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/image.jp
 python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output"
 ```
 
-### Run Test Verification:
-```bash
-python agent-veo3/scripts/tests/test_e2e_generate_and_unwatermark.py
-```
+### LaMa AI Model Setup (Optional for `-e lama`):
+Place `lama_fp32.onnx` (~198MB) in `agent-veo3/assets/models/`:
+- **HuggingFace:** [lama_fp32.onnx (208 MB)](https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx?download=true)
+- **GitHub Releases:** [big-lama.onnx (208 MB)](https://github.com/xulihang/ImageTrans_plugins/releases/download/plugins/big-lama.onnx)
+*Auto-detects NVIDIA CUDA GPU, DirectX 12 GPU (DirectML), or CPU.*
 
 ## 5. Python API Integration
 

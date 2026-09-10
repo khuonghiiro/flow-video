@@ -74,33 +74,49 @@ $$B = \frac{I - \alpha \cdot 255}{1 - \alpha}$$
 
 Mọi lệnh đều chạy từ thư mục gốc của dự án (`flow-video`):
 
-### 1. Khử logo cho một bức ảnh đơn lẻ:
-Tự động tạo ra file `<tên_ảnh>_cleaned.<ext>` cùng thư mục:
+### 1. Khử logo bằng Toán Học Reverse Alpha Blending (Mặc định - 6ms):
+Giữ 100% pixel gốc, tự bù vi hạt thích ứng, không cần model AI:
 ```bash
 python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/A_breathtaking_golden_sunset.jpeg"
 ```
 
-### 2. Khử logo và lưu sang file đích tùy chọn:
+### 2. Khử logo bằng Deep AI LaMa Inpainting (Tùy chọn nâng cao):
+Sử dụng mô hình AI LaMa ONNX (tự động tăng tốc GPU NVIDIA / GPU DirectX 12 / CPU):
+```bash
+python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/input.jpeg" -e lama
+```
+
+### 3. Khử logo và lưu sang file đích tùy chọn:
 ```bash
 python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output/input.jpeg" -o "agent-veo3/output/output_clean.jpeg"
 ```
 
-### 3. Xử lý hàng loạt (Batch Processing) cho cả thư mục:
+### 4. Xử lý hàng loạt (Batch Processing) cho cả thư mục:
 Tự động quét tất cả ảnh `.jpg`, `.jpeg`, `.png`, `.webp` trong thư mục và làm sạch đồng loạt:
 ```bash
 python agent-veo3/scripts/remove_gemini_watermark.py "agent-veo3/output"
 ```
 
-### 4. Chạy kịch bản kiểm thử (Test Script):
-Script kiểm thử nằm trong thư mục `tests/` riêng biệt (không ảnh hưởng Git):
-```bash
-python agent-veo3/scripts/tests/test_e2e_generate_and_unwatermark.py
-```
+---
+
+## 📦 Hướng Dẫn Tải Model AI LaMa (`lama_fp32.onnx`)
+
+Khi bạn hoặc user khác pull repo về máy mới, chế độ mặc định **Reverse Alpha** luôn hoạt động sẵn sàng 100% mà không cần tải thêm bất cứ file nào.
+
+Nếu muốn sử dụng thêm chế độ AI LaMa Inpainting (`-e lama`):
+1. **Tải file model (khoảng ~198MB):**
+   - **Link HuggingFace:** [lama_fp32.onnx (208 MB)](https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx?download=true)
+   - **Link GitHub Releases:** [big-lama.onnx (208 MB)](https://github.com/xulihang/ImageTrans_plugins/releases/download/plugins/big-lama.onnx)
+2. **Copy file vào thư mục:**
+   ```
+   agent-veo3/assets/models/lama_fp32.onnx
+   ```
+   *(Hệ thống hỗ trợ tự động cả 2 tên file `lama_fp32.onnx` hoặc `big-lama.onnx`)*.
+3. **Hỗ trợ phần cứng:** Tự động dùng card GPU NVIDIA (CUDA), GPU Windows DirectX 12 (Intel/AMD/NVIDIA), hoặc CPU thuần mà không cần thiết lập gì thêm.
 
 ---
 
 ## ⚡ Hiệu Năng Xử Lý
 
-* **Thời gian thuật toán:** ~6.6 ms / ảnh (> 150 FPS, đủ tốc độ xử lý video real-time).
-* **Thời gian tổng thể (kèm đọc/ghi ổ đĩa):** ~35 ms / ảnh (~30 ảnh / giây).
-* **Phần cứng yêu cầu:** Chạy trực tiếp trên CPU qua NumPy và OpenCV, không tốn VRAM GPU, không cần tải model AI nặng.
+* **Engine Reverse Alpha (Toán học):** ~6.6 ms / ảnh (> 150 FPS), 0 MB model, bảo tồn nguyên vẹn 100% pixel gốc.
+* **Engine LaMa AI (Deep Learning):** ~15 ms / ảnh (NVIDIA GPU) hoặc ~150 - 250 ms / ảnh (CPU thuần qua ONNX Runtime), tự động nối vân nền phức tạp.

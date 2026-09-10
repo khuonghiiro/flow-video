@@ -158,13 +158,13 @@ def remove_watermark(
     asset_dir: Path | None = None,
     aggressive: bool = False,
     restore_grain: bool = True,
+    engine: str = "alpha",
+    model_path: Path | str | None = None,
 ) -> np.ndarray:
     """
     Khử watermark Gemini/Flow bảo tồn 100% chi tiết pixel gốc.
-    - Dùng thuật toán Reverse Alpha Blending chính xác:
-      B = clip((I - alpha * 255) / (1 - alpha), 0, 255)
-    - Tự động phục hồi vi hạt (adaptive micro-grain) tại lõi alpha cao bị lượng tử
-      hóa nén JPEG làm phẳng, giúp ảnh sau zoom sâu mượt mà và liền mạch 100%.
+    - engine='alpha': Dùng Reverse Alpha Blending chính xác + Adaptive Grain Restoration (Mặc định, 6ms, siêu nét).
+    - engine='lama': Dùng LaMa AI Deep Inpainting (ONNX Runtime, tự động GPU CUDA/DirectML/CPU, ~150ms).
     """
     h, w = img.shape[:2]
     
@@ -193,6 +193,20 @@ def remove_watermark(
         x1 = w - target_size - expected_offset
         y1 = h - target_size - expected_offset
         x2, y2 = x1 + t_w, y1 + t_h
+
+    # Nếu người dùng yêu cầu chế độ LaMa AI
+    if engine in ("lama", "ai"):
+        try:
+            from lama_inpaint import remove_watermark_lama, get_default_model_path
+            target_model = model_path or get_default_model_path()
+            if target_model and Path(target_model).exists():
+                mask = np.zeros((h, w), dtype=np.uint8)
+                mask[y1:y2, x1:x2] = (alpha_norm > 0.05).astype(np.uint8) * 255
+                return remove_watermark_lama(img, mask, model_path=target_model)
+            else:
+                print("[WARN] Chưa có model LaMa ONNX trong assets/models/, chuyển sang Reverse Alpha Blending...")
+        except Exception as e:
+            print(f"[WARN] Không thể chạy LaMa AI ({e}), chuyển sang Reverse Alpha Blending...")
 
     # Phục hồi bằng Reverse Alpha Blending chính xác
     patch = img[y1:y2, x1:x2].astype(np.float64)
@@ -240,7 +254,9 @@ def remove_watermark(
 def process_file(
     input_path: str | Path,
     output_path: str | Path | None = None,
-    alpha_peak: float | None = None
+    alpha_peak: float | None = None,
+    engine: str = "alpha",
+    model_path: Path | str | None = None,
 ) -> bool:
     """Xử lý một file ảnh đơn lẻ."""
     in_p = Path(input_path)
@@ -253,7 +269,7 @@ def process_file(
         print(f"[ERROR] Không thể đọc ảnh: {in_p}")
         return False
         
-    cleaned = remove_watermark(img, alpha_peak=alpha_peak)
+    cleaned = remove_watermark(img, alpha_peak=alpha_peak, engine=engine, model_path=model_path)
     
     if output_path is None:
         if in_p.parent.name == "watermarks":
@@ -287,6 +303,17 @@ def main():
         default=None,
         help="Độ mờ alpha tùy chỉnh của watermark (mặc định: tự động theo calibrated template)"
     )
+    parser.add_argument(
+        "-e", "--engine",
+        choices=["alpha", "lama", "ai"],
+        default="alpha",
+        help="Engine khử logo: 'alpha' (Reverse Alpha Blending + Grain, 6ms) hoặc 'lama'/'ai' (LaMa AI Inpainting, GPU/CPU)"
+    )
+    parser.add_argument(
+        "-m", "--model",
+        default=None,
+        help="Đường dẫn tùy chọn tới file model LaMa ONNX (mặc định tìm trong agent-veo3/assets/models/)"
+    )
     args = parser.parse_args()
     
     # Mặc định quét agent-veo3/output/watermarks nếu không truyền tham số
@@ -301,7 +328,7 @@ def main():
         in_path = Path(args.input)
         
     if in_path.is_file():
-        process_file(in_path, args.output, alpha_peak=args.alpha)
+        process_file(in_path, args.output, alpha_peak=args.alpha, engine=args.engine, model_path=args.model)
     elif in_path.is_dir():
         image_exts = {".jpg", ".jpeg", ".png", ".webp"}
         files = [f for f in in_path.iterdir() if f.suffix.lower() in image_exts and "_cleaned" not in f.name]
@@ -312,10 +339,11 @@ def main():
                 out_file = Path(args.output) / f.name
             elif in_path.name == "watermarks":
                 out_file = in_path.parent / "cleaned" / f.name
-            process_file(f, out_file, alpha_peak=args.alpha)
+            process_file(f, out_file, alpha_peak=args.alpha, engine=args.engine, model_path=args.model)
     else:
         print(f"[ERROR] Đường dẫn không hợp lệ: {in_path}")
         sys.exit(1)
+
 
 
 if __name__ == "__main__":
