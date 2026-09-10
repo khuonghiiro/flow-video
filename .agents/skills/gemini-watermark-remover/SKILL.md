@@ -15,13 +15,22 @@ Use this skill when you need to remove the visible watermark (semi-transparent 4
 ```
 agent-veo3/
 ├── assets/watermarks/                  # Reference masks (bg_48.png, bg_96.png)
+├── output/
+│   ├── watermarks/                     # Raw downloaded images with watermark
+│   └── cleaned/                        # Restored pristine images
 ├── scripts/
 │   ├── remove_gemini_watermark.py      # [PRODUCTION] Main processing logic (Committed to Git)
 │   └── tests/                          # [TESTING] Ignored by git (.gitignore)
-│       └── test_e2e_generate_and_unwatermark.py
+│       └── test_full_pipeline_clean_flow.py
 └── skills_vi/
     └── fk-unwatermark.md               # Vietnamese skill guide
 ```
+
+### Folder Conventions & Pipeline Dispatch:
+1. **Raw Downloads:** Save watermarked images to `agent-veo3/output/watermarks/`.
+2. **Cleaned Output:** Output restored images to `agent-veo3/output/cleaned/`.
+3. **Upload to Flow:** Upload from `agent-veo3/output/cleaned/`, caching uploaded UUIDs to **never upload duplicates**.
+4. **Single-frame Video (1 Image):** Strictly use **I2V (Image-to-Video - RPC `eb1hJf`)**, never use Frame-to-Frame interpolation (`nprQif`).
 
 ## 2. Core Mathematical Principle
 

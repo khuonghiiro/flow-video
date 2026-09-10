@@ -209,6 +209,16 @@ def build_f2f_request(
         item[5] = [null, end_id, null, null, null, crop_box]        # end frame
         item[6] = [null, null, null, null, U1, U2]                  # UUIDs
     """
+    if not end_media_id and start_media_id:
+        return build_r2v_request(
+            prompt=prompt,
+            project_id=project_id,
+            reference_media_ids=[start_media_id],
+            aspect=aspect,
+            model=resolve_r2v_model(model),
+            count=count,
+        )
+
     crop_val = getattr(fb, "FULL_FRAME_CROP", [None, 0.0038759689922481244, 1, 0.9961240310077519]) if crop is None else crop
     asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
     resolved_model = resolve_f2f_model(model)
@@ -224,7 +234,7 @@ def build_f2f_request(
             [None, end_media_id, None, None, None, crop_val],
             [None, None, None, None, fb._client_uuid(), fb._client_uuid()],
         ])
-    inner = [items, fb._context(project_id), [fb._client_uuid(), 2]]
+    inner = [items, fb._context(project_id), [fb._client_uuid(), 1]]
     return fb.build_envelope(RPC_GEN_F2F, inner)
 
 
@@ -270,12 +280,23 @@ def read_all_operations(payload: Any) -> list[fb.Operation]:
         if not isinstance(record, list) or len(record) < 1:
             continue
         op_id = record[0]
+        proj_id = record[1] if len(record) > 1 else None
+        status = record[3] if len(record) > 3 and isinstance(record[3], str) else None
+
+        # Check if this is a node record: [node_id, null, null, [title, ts, null, null, op_id, ...], proj_id]
+        detail = record[3] if len(record) > 3 else None
+        if isinstance(detail, list) and len(detail) > 4 and isinstance(detail[4], str) and detail[4]:
+            op_id = detail[4]
+            status = "MEDIA_GENERATION_STATUS_PENDING"
+            if len(record) > 4 and isinstance(record[4], str):
+                proj_id = record[4]
+
         if not isinstance(op_id, str) or not op_id:
             continue
         operations.append(fb.Operation(
             operation_id=op_id,
-            project_id=record[1] if len(record) > 1 else None,
-            status=record[3] if len(record) > 3 and isinstance(record[3], str) else None,
+            project_id=proj_id,
+            status=status,
             error=fb.read_operation_error(record) if len(record) > 5 else None,
         ))
 

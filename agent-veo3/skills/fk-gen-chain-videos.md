@@ -26,7 +26,7 @@ Scene N (chain head or middle): startImage = sceneN.image, endImage = sceneN+1.i
 Scene N+1 (next in chain):      startImage = sceneN+1.image, endImage = sceneN+2.image (if N+2 exists)
 
 Last scene in chain (no child): startImage = lastScene.image, NO endImage
-                                → plain I2V (eb1hJf), no chained transition
+                                → plain R2V/I2V (MZZa6b - Tạo video với ảnh), no chained transition
 ```
 
 **Key invariant**: at the cut between two consecutive chain scenes, `sceneN.video.last_frame == sceneN+1.image == sceneN+1.video.first_frame` → **concat is seamless**.

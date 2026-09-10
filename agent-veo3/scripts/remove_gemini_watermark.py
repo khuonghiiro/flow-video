@@ -70,27 +70,52 @@ def load_watermark_template(size: int = 48, asset_dir: Path | None = None) -> np
 def detect_watermark_position(
     img: np.ndarray,
     template: np.ndarray,
-    search_margin: int = 250
+    target_size: int = 48,
+    search_radius: int = 8,
 ) -> tuple[int, int, float]:
     """
-    Tự động dò tìm tọa độ (x, y) của logo ở góc dưới bên phải bằng cross-correlation chuẩn hóa.
-    Trả về: (best_x, best_y, confidence)
+    Định vị chính xác logo watermark ở góc dưới bên phải.
+    Vị trí thiết kế chuẩn của Google Imagen / Flow:
+    - 48px: offset = 73px từ cạnh phải và cạnh đáy (anchor: w - 48 - 73, h - 48 - 73).
+    - 96px: offset = 146px từ cạnh phải và cạnh đáy (anchor: w - 96 - 146, h - 96 - 146).
+    
+    Tìm kiếm cục bộ chỉ trong bán kính hẹp xung quanh anchor (+/- search_radius),
+    triệt tiêu hoàn toàn nguy cơ nhảy sai tọa độ do vân nền phức tạp gây ra.
     """
     h, w = img.shape[:2]
-    t_h, t_w = template.shape[:2]
-    
-    y0 = max(0, h - search_margin)
-    x0 = max(0, w - search_margin)
-    search_roi = img[y0:h, x0:w]
-    
-    gray_roi = cv2.cvtColor(search_roi, cv2.COLOR_BGR2GRAY)
-    res = cv2.matchTemplate(gray_roi, template, cv2.TM_CCOEFF_NORMED)
+    expected_offset = 73 if target_size == 48 else 146
+    x_anchor = w - target_size - expected_offset
+    y_anchor = h - target_size - expected_offset
+
+    if x_anchor < 0 or y_anchor < 0:
+        return max(0, w - target_size), max(0, h - target_size), 1.0
+
+    # Lấy vùng ROI nhỏ quanh anchor
+    y_min = max(0, y_anchor - search_radius)
+    y_max = min(h, y_anchor + target_size + search_radius)
+    x_min = max(0, x_anchor - search_radius)
+    x_max = min(w, x_anchor + target_size + search_radius)
+
+    roi = img[y_min:y_max, x_min:x_max]
+    if roi.shape[0] < target_size or roi.shape[1] < target_size:
+        return x_anchor, y_anchor, 1.0
+
+    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    tpl_gray = template if len(template.shape) == 2 else cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+    if tpl_gray.dtype != np.uint8:
+        tpl_gray = np.clip(tpl_gray * 255.0, 0, 255).astype(np.uint8) if tpl_gray.max() <= 1.0 else tpl_gray.astype(np.uint8)
+
+    res = cv2.matchTemplate(gray_roi, tpl_gray, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, max_loc = cv2.minMaxLoc(res)
-    
-    found_x = x0 + max_loc[0]
-    found_y = y0 + max_loc[1]
-    
-    return found_x, found_y, float(max_val)
+
+    best_x = x_min + max_loc[0]
+    best_y = y_min + max_loc[1]
+
+    # Nếu correlation hợp lệ trong vùng lân cận, nhận best_x, best_y; nếu không giữ anchor
+    if max_val < 0.25:
+        return x_anchor, y_anchor, 1.0
+
+    return best_x, best_y, float(max_val)
 
 
 def load_calibrated_alpha(size: int = 48, asset_dir: Path | None = None) -> np.ndarray:
@@ -98,12 +123,13 @@ def load_calibrated_alpha(size: int = 48, asset_dir: Path | None = None) -> np.n
     if asset_dir is None:
         asset_dir = get_default_asset_dir()
     
-    npy_path = asset_dir / f"perfect_alpha_{size}.npy"
-    if npy_path.exists():
-        try:
-            return np.load(str(npy_path))
-        except Exception:
-            pass
+    for filename in [f"true_calibrated_alpha_{size}.npy", f"perfect_alpha_{size}.npy"]:
+        npy_path = asset_dir / filename
+        if npy_path.exists():
+            try:
+                return np.load(str(npy_path))
+            except Exception:
+                pass
             
     # Fallback template png
     template = load_watermark_template(size, asset_dir)
@@ -112,7 +138,7 @@ def load_calibrated_alpha(size: int = 48, asset_dir: Path | None = None) -> np.n
 
 def remove_watermark(
     img: np.ndarray,
-    alpha_peak: float = 0.295,
+    alpha_peak: float | None = None,
     target_size: int | None = None,
     asset_dir: Path | None = None,
     aggressive: bool = False,
@@ -134,22 +160,23 @@ def remove_watermark(
     template = load_watermark_template(target_size, asset_dir)
     alpha_map = load_calibrated_alpha(target_size, asset_dir)
     
-    # Chuẩn hóa alpha_peak
-    if alpha_map.max() > 0:
+    # Chuẩn hóa alpha_peak nếu người dùng chỉ định cụ thể
+    if alpha_peak is not None and alpha_map.max() > 0:
         alpha_norm = (alpha_map / alpha_map.max()) * alpha_peak
     else:
         alpha_norm = alpha_map
     
     # Tự động định vị watermark
-    found_x, found_y, score = detect_watermark_position(img, template)
+    found_x, found_y, score = detect_watermark_position(img, template, target_size=target_size)
     t_h, t_w = alpha_norm.shape[:2]
     
-    # Kiểm tra bounds và fallback vị trí chuẩn (~73px từ góc phải dưới)
+    # Kiểm tra bounds và fallback vị trí chuẩn
+    expected_offset = 73 if target_size == 48 else 146
     x1, y1 = found_x, found_y
     x2, y2 = x1 + t_w, y1 + t_h
-    if x1 < 0 or y1 < 0 or x2 > w or y2 > h or score < 0.35:
-        x1 = w - target_size - 73
-        y1 = h - target_size - 73
+    if x1 < 0 or y1 < 0 or x2 > w or y2 > h:
+        x1 = w - target_size - expected_offset
+        y1 = h - target_size - expected_offset
         x2, y2 = x1 + t_w, y1 + t_h
 
     # Phục hồi bằng Reverse Alpha Blending chính xác
