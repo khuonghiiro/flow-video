@@ -470,38 +470,319 @@ if (chrome.runtime?.onConnect) {
       } else if (msg.method === 'get_captured_video_urls') {
         sendToAgent({ id: msg.id, result: _latestVideoUrls });
       } else if (msg.method === 'get_captured_batches') {
-        sendToAgent({ id: msg.id, result: _capturedBatches });
+        chrome.storage.local.get(['sniffer_logs'], (res) => {
+          sendToAgent({ id: msg.id, result: res?.sniffer_logs || [] });
+        });
+      } else if (msg.method === 'get_sniffer_logs') {
+        chrome.storage.local.get(['sniffer_logs'], (res) => {
+          sendToAgent({ id: msg.id, result: res?.sniffer_logs || [] });
+        });
       } else if (msg.method === 'exec_tab') {
         const { tabId, code } = msg.params || {};
         try {
           let target = tabId;
           if (!target) {
             const tabs = await chrome.tabs.query({ url: flowUrls });
-            target = tabs[0]?.id;
+            const projTab = tabs.find(t => t.url && t.url.includes('/project/'));
+            const activeTab = tabs.find(t => t.active);
+            target = (activeTab?.url && activeTab.url.includes('/project/')) ? activeTab.id : (projTab?.id || activeTab?.id || tabs[0]?.id);
           }
-          if (!target) {
+          if (code === 'list_tabs') {
+            const all = await chrome.tabs.query({});
+            sendToAgent({ id: msg.id, result: all.map(t => ({ id: t.id, url: t.url, title: t.title, active: t.active })) });
+          } else if (!target) {
             sendToAgent({ id: msg.id, error: 'NO_TARGET_TAB' });
           } else if (code === 'reload') {
             await chrome.tabs.reload(target);
             sendToAgent({ id: msg.id, result: { success: true, reloaded: true, tabId: target } });
-          } else if (code === 'click_start_chip') {
+          } else if (code === 'inspect_f2f_ui') {
             const results = await chrome.scripting.executeScript({
               target: { tabId: target },
               func: () => {
-                const elms = Array.from(document.querySelectorAll('button, [role="button"], a, input, select')).filter(e => {
-                  const val = (e.innerText || e.getAttribute('aria-label') || e.title || '').trim();
+                const chips = Array.from(document.querySelectorAll('button, [role="button"]')).filter(e => {
+                  const val = (e.innerText || e.getAttribute('aria-label') || '').trim();
                   return val === 'Start' || val === 'End';
-                });
+                }).map(b => ({
+                  text: (b.innerText || '').trim(),
+                  tag: b.tagName,
+                  class: b.className,
+                  html: b.outerHTML.slice(0, 300),
+                  parentHtml: b.parentElement?.parentElement?.outerHTML?.slice(0, 600)
+                }));
+                const promptBar = document.querySelector('textarea, [contenteditable="true"], input[type="text"]')?.outerHTML?.slice(0, 300);
                 return {
-                  matches: elms.map(e => ({
-                    tag: e.tagName,
-                    class: e.className,
-                    text: e.innerText,
-                    ariaLabel: e.getAttribute('aria-label'),
-                    html: e.outerHTML.slice(0, 300)
-                  }))
+                  chips,
+                  promptBar,
+                  activeElement: document.activeElement ? {
+                    tag: document.activeElement.tagName,
+                    text: document.activeElement.innerText?.slice(0, 50),
+                    class: document.activeElement.className
+                  } : null
                 };
               }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
+          } else if (code === 'inspect_full_flow_state') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: () => {
+                const chips = Array.from(document.querySelectorAll('.ingredient-bar-container *')).map(e => ({
+                  tag: e.tagName,
+                  class: e.className,
+                  text: (e.innerText || '').trim(),
+                  aria: e.getAttribute('aria-label'),
+                  src: e.src || e.querySelector('img')?.src,
+                }));
+                const allButtons = Array.from(document.querySelectorAll('button, mat-select, [role="button"], [role="combobox"]')).map(b => ({
+                  tag: b.tagName,
+                  class: b.className,
+                  text: (b.innerText || '').trim().replace(/\s+/g, ' '),
+                  aria: b.getAttribute('aria-label'),
+                })).filter(b => b.text && (
+                  b.text.includes('Veo') || b.text.includes('Lite') || b.text.includes('Low') ||
+                  b.text.includes('Priority') || b.text.includes('Start') || b.text.includes('End') ||
+                  b.text.includes('Generate') || b.text.includes('Tạo') || b.text.includes('Video')
+                ));
+                const canvasImages = Array.from(document.querySelectorAll('img')).map((im, idx) => {
+                  const card = im.closest('[role="button"], button, div.card, .card-container, [tabindex]');
+                  return {
+                    idx,
+                    src: im.src?.slice(0, 120),
+                    alt: im.alt,
+                    class: im.className,
+                    cardClass: card?.className,
+                    cardTag: card?.tagName,
+                  };
+                }).filter(i => i.src && (i.src.includes('flow-content.google') || i.src.includes('googleusercontent')));
+                return { chips, allButtons, canvasImages };
+              }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
+          } else if (code === 'get_sniffer_logs_internal') {
+            chrome.storage.local.get(['sniffer_logs'], (res) => {
+              sendToAgent({ id: msg.id, result: res?.sniffer_logs || [] });
+            });
+          } else if (code === 'inspect_settings_menu') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: () => {
+                const btn = document.querySelector('button.settings-trigger-button, .settings-trigger-button');
+                if (btn) btn.click();
+                const overlays = Array.from(document.querySelectorAll('.cdk-overlay-pane, mat-dialog-container, [role="menu"], [role="dialog"]')).map(o => ({
+                  tag: o.tagName,
+                  class: o.className,
+                  text: (o.innerText || '').trim().slice(0, 1000),
+                  items: Array.from(o.querySelectorAll('button, mat-radio-button, mat-option, [role="menuitem"], [role="option"]')).map(i => ({
+                    tag: i.tagName,
+                    class: i.className,
+                    text: (i.innerText || '').trim(),
+                    aria: i.getAttribute('aria-label')
+                  }))
+                }));
+                return { btnFound: !!btn, overlays };
+              }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
+          } else if (code === 'inspect_cards_and_canvas') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: () => {
+                const canvasTiles = Array.from(document.querySelectorAll('img')).map((im, idx) => {
+                  const container = im.closest('flow-asset-card, .asset-card, [role="button"], div[tabindex], div.card');
+                  return {
+                    idx,
+                    src: im.src.slice(0, 100),
+                    alt: im.alt,
+                    containerTag: container?.tagName,
+                    containerClass: container?.className,
+                    containerText: container?.innerText?.trim()?.replace(/\s+/g, ' ')?.slice(0, 80),
+                    containerHtml: container?.outerHTML?.slice(0, 400)
+                  };
+                }).filter(i => i.src && (i.src.includes('flow-content.google') || i.src.includes('googleusercontent')));
+                return { canvasTiles };
+              }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
+          } else if (code === 'click_canvas_image_and_inspect') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: async () => {
+                const allImgs = Array.from(document.querySelectorAll('img')).filter(im => {
+                  return im.src.includes('flow-content.google') && !im.closest('.ingredient-bar-container');
+                });
+                if (!allImgs.length) return { error: 'No canvas images found' };
+                const targetImg = allImgs[1] || allImgs[0];
+                const card = targetImg.closest('[role="button"], button, div.card, .card-container, [tabindex]') || targetImg;
+                card.click();
+                await new Promise(r => setTimeout(r, 400));
+                
+                const buttons = Array.from(document.querySelectorAll('button, [role="menuitem"], [role="button"], a.action')).map(b => ({
+                  tag: b.tagName,
+                  class: b.className,
+                  text: (b.innerText || '').trim().replace(/\s+/g, ' '),
+                  aria: b.getAttribute('aria-label'),
+                  title: b.getAttribute('title')
+                })).filter(b => b.text || b.aria || b.title);
+                
+                const chips = Array.from(document.querySelectorAll('.ingredient-bar-container *')).map(c => ({
+                  tag: c.tagName,
+                  class: c.className,
+                  text: (c.innerText || '').trim(),
+                  aria: c.getAttribute('aria-label')
+                }));
+                
+                return {
+                  clickedImg: targetImg.src.slice(0, 100),
+                  clickedCardTag: card.tagName,
+                  clickedCardClass: card.className,
+                  chips,
+                  toolbars: buttons.filter(b => {
+                    const t = (b.text + ' ' + (b.aria||'') + ' ' + (b.title||'')).toLowerCase();
+                    return t.includes('frame') || t.includes('start') || t.includes('end') || t.includes('add') || t.includes('use') || t.includes('prompt');
+                  })
+                };
+              }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
+          } else if (code === 'click_swap_frames') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: () => {
+                const swapBtn = document.querySelector('button[aria-label="Swap first and last frames"], button.flow-icon-button-transparent:has(mat-icon:contains("swap_horiz"))');
+                const allButtons = Array.from(document.querySelectorAll('button'));
+                const targetBtn = swapBtn || allButtons.find(b => b.getAttribute('aria-label') === 'Swap first and last frames' || (b.innerText || '').includes('swap_horiz'));
+                if (!targetBtn) return { success: false, error: 'Swap button not found' };
+                targetBtn.click();
+                return { success: true, clicked: 'Swap first and last frames' };
+              }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
+          } else if (code === 'inspect_canvas_nodes_and_videos') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: () => {
+                const nodes = Array.from(document.querySelectorAll('flow-asset-card, .asset-card, .card, div.card-container, [role="button"], div[tabindex]')).map(c => ({
+                  tag: c.tagName,
+                  class: c.className,
+                  text: (c.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 150),
+                  hasVideo: !!c.querySelector('video'),
+                  hasImg: !!c.querySelector('img'),
+                  imgSrc: c.querySelector('img')?.src?.slice(0, 80),
+                  videoSrc: c.querySelector('video')?.src?.slice(0, 80)
+                })).filter(c => (c.text && c.text.length > 2) || c.hasVideo || c.hasImg);
+                const videos = Array.from(document.querySelectorAll('video')).map(v => ({
+                  src: v.src,
+                  currentSrc: v.currentSrc,
+                  duration: v.duration,
+                  paused: v.paused,
+                  parentText: v.parentElement?.innerText?.slice(0, 100)
+                }));
+                return {
+                  url: window.location.href,
+                  title: document.title,
+                  nodesCount: nodes.length,
+                  nodes: nodes.slice(0, 30),
+                  videos
+                };
+              }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
+          } else if (code === 'inspect_prompt_controls') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: () => {
+                const textarea = document.querySelector('textarea, [contenteditable="true"]');
+                const container = textarea?.closest('.prompt-container, .prompt-bar, .bottom-bar, form, .input-container') || textarea?.parentElement?.parentElement?.parentElement;
+                const buttons = Array.from(document.querySelectorAll('button')).map(b => ({
+                  tag: b.tagName,
+                  class: b.className,
+                  text: (b.innerText || '').trim().replace(/\s+/g, ' '),
+                  aria: b.getAttribute('aria-label'),
+                  title: b.getAttribute('title'),
+                  icon: b.querySelector('mat-icon')?.innerText
+                })).filter(b => b.aria || b.title || b.text || b.icon);
+                return {
+                  textareaFound: !!textarea,
+                  textareaPlaceholder: textarea?.getAttribute('placeholder'),
+                  buttonsCount: buttons.length,
+                  buttons
+                };
+              }
+            });
+          } else if (code === 'populate_f2f_both_frames') {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: async () => {
+                // Step 1: Check what is currently in Start and End
+                const chips = Array.from(document.querySelectorAll('.ingredient-bar-container *'));
+                const endEmpty = !!document.querySelector('button.empty-chip');
+                const swapBtn = Array.from(document.querySelectorAll('button')).find(b => b.getAttribute('aria-label') === 'Swap first and last frames' || (b.innerText || '').includes('swap_horiz'));
+                
+                // Get canvas images
+                const canvasImages = Array.from(document.querySelectorAll('img')).filter(im => {
+                  return im.src.includes('flow-content.google') && !im.closest('.ingredient-bar-container');
+                });
+                
+                const report = { initialEndEmpty: endEmpty, canvasImagesCount: canvasImages.length, steps: [] };
+                
+                // If Start has an image and End is empty, clicking swap moves that image to End!
+                if (swapBtn && endEmpty) {
+                  swapBtn.click();
+                  report.steps.push('Clicked swap button to move Start to End');
+                  await new Promise(r => setTimeout(r, 600));
+                }
+                
+                // Now Start is empty (or End has the image). Let's click the first canvas image!
+                if (canvasImages.length > 0) {
+                  const card0 = canvasImages[0].closest('[role="button"], button, div.card, .card-container, [tabindex]') || canvasImages[0];
+                  card0.click();
+                  report.steps.push('Clicked first canvas card (frame 1)');
+                  await new Promise(r => setTimeout(r, 600));
+                }
+                
+                // Inspect result chips
+                const finalChips = Array.from(document.querySelectorAll('.ingredient-bar-container button, .ingredient-bar-container .empty-chip, .ingredient-bar-container img')).map(e => ({
+                  tag: e.tagName,
+                  class: e.className,
+                  text: (e.innerText || '').trim(),
+                  src: e.src?.slice(0, 100),
+                  aria: e.getAttribute('aria-label')
+                }));
+                report.finalChips = finalChips;
+                return report;
+              }
+            });
+            sendToAgent({ id: msg.id, result: results[0]?.result });
+          } else if (code === 'click_start_chip' || code === 'click_end_chip') {
+            const isEnd = code === 'click_end_chip';
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: target },
+              func: (isEndTarget) => {
+                const chips = Array.from(document.querySelectorAll('button, [role="button"], .empty-chip, .chip, a')).filter(e => {
+                  const v = (e.innerText || e.getAttribute('aria-label') || e.title || '').trim();
+                  return v === 'Start' || v === 'End';
+                });
+                const targetBtn = isEndTarget 
+                  ? chips.find(c => (c.innerText || c.getAttribute('aria-label') || '').trim() === 'End') 
+                  : chips.find(c => (c.innerText || c.getAttribute('aria-label') || '').trim() === 'Start');
+                if (!targetBtn) {
+                  return { success: false, error: 'Target chip not found', chipsFound: chips.length, chips: chips.map(c => ({ tag: c.tagName, text: c.innerText })) };
+                }
+                targetBtn.click();
+                targetBtn.focus();
+                return {
+                  success: true,
+                  target: isEndTarget ? 'End' : 'Start',
+                  btnClass: targetBtn.className,
+                  btnText: targetBtn.innerText,
+                  activeElement: document.activeElement ? {
+                    tag: document.activeElement.tagName,
+                    class: document.activeElement.className,
+                    text: document.activeElement.innerText?.slice(0, 30)
+                  } : null
+                };
+              },
+              args: [isEnd]
             });
             sendToAgent({ id: msg.id, result: results[0]?.result });
           } else if (code && (code.startsWith('http://') || code.startsWith('https://') || code.startsWith('nav:'))) {
@@ -526,17 +807,46 @@ if (chrome.runtime?.onConnect) {
           } else {
             const results = await chrome.scripting.executeScript({
               target: { tabId: target },
-              func: () => {
-                const buttons = Array.from(document.querySelectorAll('button, [role="button"], a, input, select')).map(b => (b.innerText || b.getAttribute('aria-label') || b.title || b.value || '').trim()).filter(Boolean);
+              func: (cmdCode) => {
+                const chips = Array.from(document.querySelectorAll('button.empty-chip, button.chip'));
+                const startBtn = chips.find(c => c.innerText.trim() === 'Start');
+                const endBtn = chips.find(c => c.innerText.trim() === 'End');
+                
+                if (cmdCode === 'click_first_image') {
+                  const imgTiles = Array.from(document.querySelectorAll('img[alt*="user\'s image"]'));
+                  if (!imgTiles.length) return { error: 'No image tiles found' };
+                  const tile = imgTiles[0].closest('div.card, div[role="button"], div.container, [tabindex]') || imgTiles[0];
+                  tile.click();
+                  const chips = Array.from(document.querySelectorAll('.ingredient-bar-container *')).map(c => ({
+                    tag: c.tagName,
+                    class: c.className,
+                    text: (c.innerText || '').trim(),
+                    src: c.src?.slice(0, 100),
+                    html: c.outerHTML.slice(0, 200)
+                  }));
+                  return { success: true, tileClicked: tile.tagName, chips };
+                }
+                
+                if (cmdCode === 'click_start') {
+                  if (!startBtn) return { error: 'Start button not found' };
+                  startBtn.click();
+                  startBtn.focus();
+                  return {
+                    success: true,
+                    clicked: 'Start',
+                    activeElement: document.activeElement ? { tag: document.activeElement.tagName, class: document.activeElement.className } : null,
+                    overlayCount: document.querySelectorAll('.cdk-overlay-container, .cdk-overlay-pane').length,
+                    overlayHtml: document.querySelector('.cdk-overlay-container')?.innerHTML?.slice(0, 1000)
+                  };
+                }
+
                 return {
-                  success: true,
-                  title: document.title,
-                  location: window.location.href,
-                  imgCount: document.querySelectorAll('img').length,
-                  vidCount: document.querySelectorAll('video').length,
-                  interactive: Array.from(new Set(buttons)).slice(0, 80),
+                  startFound: !!startBtn,
+                  endFound: !!endBtn,
+                  chips: chips.map(c => ({ class: c.className, text: c.innerText.trim(), html: c.outerHTML }))
                 };
               },
+              args: [code]
             });
             sendToAgent({ id: msg.id, result: results[0]?.result });
           }
@@ -554,14 +864,8 @@ if (chrome.runtime?.onConnect) {
           ws.send(JSON.stringify({ type: 'pong' }));
         }
       } else if (msg.type === 'reload_extension' || msg.method === 'reload_extension') {
-        console.log('[FlowAgent] Reloading flow tabs and extension on agent command');
-        try {
-          const flowTabs = await chrome.tabs.query({ url: ['https://flow.google.com/*', 'https://labs.google/*'] });
-          for (const t of flowTabs) {
-            if (t.id) chrome.tabs.reload(t.id);
-          }
-        } catch {}
-        setTimeout(() => chrome.runtime.reload(), 500);
+        console.log('[FlowAgent] Reloading extension background worker');
+        setTimeout(() => chrome.runtime.reload(), 300);
       } else if (msg.type === 'update_request_log') {
         let updated = false;
         if (msg.id) {

@@ -56,26 +56,34 @@ def resolve_t2v_model(duration_s: Any = 8) -> str:
 
 # ── F2F / Interpolation model keys ───────────────────────────────────────────
 
-F2F_DURATION_MAP = {
-    4: "veo_3_1_i2v_s_lite_4s_fl_low_priority",
-    6: "veo_3_1_i2v_s_lite_6s_fl_low_priority",
-    8: "veo_3_1_interpolation_lite_low_priority",
+F2F_MODELS = {
+    "veo_3_1_interpolation_lite_low_priority",
+    "veo_3_1_interpolation_lite",
+    "veo_3_1_interpolation_fast_ultra",
 }
 
 F2F_DEFAULT = "veo_3_1_interpolation_lite_low_priority"
 
 
-def resolve_f2f_model(duration_s: Any = 8, tier: str = "") -> str:
-    """Pick the F2F model key based on duration.
+def resolve_f2f_model(key_or_duration: Any = 8, tier: str = "") -> str:
+    """Pick the accepted wire F2F model key for Veo 3.1 Lite Lower Priority (0 credits).
 
-    4s/6s use ``i2v_s_lite_*s_fl_low_priority`` (first+last variant).
-    8s uses ``interpolation_lite_low_priority`` (generic interpolation).
-    Ultra tier can override to ``interpolation_fast_ultra``.
+    Matches Google Flow batchexecute nprQif wire traffic:
+    - Default (0 credits / low priority): ``veo_3_1_interpolation_lite_low_priority``
+    - Ultra: ``veo_3_1_interpolation_fast_ultra``
+    - Standard Lite: ``veo_3_1_interpolation_lite``
     """
-    dur = int(duration_s) if duration_s else 8
-    if "ultra" in str(tier).lower():
+    if "ultra" in str(tier).lower() or (isinstance(key_or_duration, str) and "ultra" in key_or_duration.lower()):
         return "veo_3_1_interpolation_fast_ultra"
-    return F2F_DURATION_MAP.get(dur, F2F_DEFAULT)
+    if isinstance(key_or_duration, str):
+        if key_or_duration in F2F_MODELS:
+            return key_or_duration
+        k = key_or_duration.lower()
+        if "ultra" in k:
+            return "veo_3_1_interpolation_fast_ultra"
+        if "lite" in k or "low_priority" in k or "lower" in k:
+            return F2F_DEFAULT
+    return F2F_DEFAULT
 
 
 # ── R2V model keys ───────────────────────────────────────────────────────────
@@ -201,21 +209,22 @@ def build_f2f_request(
         item[5] = [null, end_id, null, null, null, crop_box]        # end frame
         item[6] = [null, null, null, null, U1, U2]                  # UUIDs
     """
-    crop_val = [None, None, 1, 1] if crop is None else crop
-    asp_val = fb.resolve_video_aspect(aspect)
+    crop_val = getattr(fb, "FULL_FRAME_CROP", [None, 0.0038759689922481244, 1, 0.9961240310077519]) if crop is None else crop
+    asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
+    resolved_model = resolve_f2f_model(model)
 
     items = []
     for _ in range(max(1, min(count, 4))):
         items.append([
             [None, None, [[[prompt]]]],
-            model,
+            resolved_model,
             asp_val,
             None,
             [None, start_media_id, None, None, None, crop_val],
             [None, end_media_id, None, None, None, crop_val],
             [None, None, None, None, fb._client_uuid(), fb._client_uuid()],
         ])
-    inner = [items, fb._context(project_id), [fb._client_uuid(), 1]]
+    inner = [items, fb._context(project_id), [fb._client_uuid(), 2]]
     return fb.build_envelope(RPC_GEN_F2F, inner)
 
 

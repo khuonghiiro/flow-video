@@ -141,6 +141,12 @@ def patch_flow_client():
 
         RPC_GEN_INTERPOLATION = "nprQif"
         INTERPOLATION_MODELS = {
+            "veo_3_1_i2v_lite_low_priority",
+            "veo_3_1_i2v_s_lite_4s_fl_low_priority",
+            "veo_3_1_i2v_s_lite_6s_fl_low_priority",
+            "veo_3_1_i2v_s_lite_8s_fl_low_priority",
+            "veo_3_1_i2v_lite",
+            "veo_3_1_i2v_s_fast_ultra_fl",
             "veo_3_1_interpolation_lite_low_priority",
             "veo_3_1_interpolation_lite",
             "veo_3_1_interpolation_fast_ultra",
@@ -153,10 +159,8 @@ def patch_flow_client():
                 k = key.lower()
                 if "ultra" in k:
                     return "veo_3_1_interpolation_fast_ultra"
-                if "lite_low_priority" in k or "low_priority" in k:
+                if "lite" in k or "low_priority" in k or "lower" in k:
                     return "veo_3_1_interpolation_lite_low_priority"
-                if "lite" in k:
-                    return "veo_3_1_interpolation_lite"
             return "veo_3_1_interpolation_lite_low_priority"
 
         def build_interpolation_request(
@@ -165,19 +169,20 @@ def patch_flow_client():
             start_media_id: str = "",
             end_media_id: str = "",
             crop: Optional[list] = None,
-            aspect: Any = None,
+            aspect: Any = "VIDEO_ASPECT_RATIO_LANDSCAPE",
             model: str = "veo_3_1_interpolation_lite_low_priority",
             start_image_media_id: str = "",
             end_image_media_id: str = "",
             count: int = 1,
             duration_s: Any = 8,
+            **kwargs,
         ) -> str:
-            start_id = start_media_id or start_image_media_id
-            end_id = end_media_id or end_image_media_id
-            crop_val = [None, None, 1, 1] if crop is None else crop
-            asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
-            # Pick model by duration: 4s/6s → i2v_s_lite_*s_fl, 8s → interpolation
-            resolved_model = vb.resolve_f2f_model(duration_s) if model == "veo_3_1_interpolation_lite_low_priority" else resolve_interp_model(model)
+            start_id = start_media_id or start_image_media_id or kwargs.get("start_frame") or kwargs.get("start_id") or ""
+            end_id = end_media_id or end_image_media_id or kwargs.get("end_frame") or kwargs.get("end_scene_media_id") or kwargs.get("end_id") or ""
+            full_crop = getattr(fb, "FULL_FRAME_CROP", [None, 0.0038759689922481244, 1, 0.9961240310077519])
+            crop_val = full_crop if (crop is None or crop == [None, None, 1, 1]) else crop
+            asp_val = fb.resolve_video_aspect(aspect or "VIDEO_ASPECT_RATIO_LANDSCAPE") if hasattr(fb, "resolve_video_aspect") else 2
+            resolved_model = resolve_interp_model(model)
             items = []
             for _ in range(max(1, min(count, 4))):
                 items.append([
@@ -189,7 +194,7 @@ def patch_flow_client():
                     [None, end_id, None, None, None, crop_val],
                     [None, None, None, None, fb._client_uuid(), fb._client_uuid()],
                 ])
-            inner = [items, fb._context(project_id), [fb._client_uuid(), 1]]
+            inner = [items, fb._context(project_id), [fb._client_uuid(), 2]]
             return fb.build_envelope(RPC_GEN_INTERPOLATION, inner)
 
         # Ensure flow_batch has interpolation capabilities exposed
@@ -230,7 +235,7 @@ def patch_flow_client():
             """
             refs = reference_media_ids or []
             ref_list = [[None, mid] for mid in refs[:3] if mid]
-            asp_val = fb.resolve_video_aspect(aspect) if hasattr(fb, "resolve_video_aspect") else 2
+            asp_val = fb.resolve_video_aspect(aspect or "VIDEO_ASPECT_RATIO_LANDSCAPE") if hasattr(fb, "resolve_video_aspect") else 2
             items = []
             for _ in range(max(1, min(count, 4))):
                 items.append([
@@ -276,39 +281,71 @@ def patch_flow_client():
 
         async def enhanced_generate_video(
             self,
-            start_image_media_id: str,
-            prompt: str,
-            project_id: str,
-            scene_id: str,
+            start_image_media_id: str = "",
+            prompt: str = "",
+            project_id: str = "",
+            scene_id: str = "",
             aspect_ratio: str = "VIDEO_ASPECT_RATIO_PORTRAIT",
             end_image_media_id: str = None,
             user_paygate_tier: str = "PAYGATE_TIER_TWO",
             duration: Optional[float] = 4.0,
             crop_coordinates: Optional[dict] = None,
             count: int = 1,
+            **kwargs,
         ) -> dict:
             from agent.config import USE_BATCH_RPC, FLOW_ALLOW_DEGRADED
             from agent.services import flow_batch as fb
             from agent.services.flow_client import _as_pending_operation, _batch_error, _unsupported
 
-            gen_type = "start_end_frame_2_video" if end_image_media_id else "frame_2_video"
+            # Normalize start and end media IDs from args and kwargs
+            start_id = (
+                start_image_media_id
+                or kwargs.get("start_media_id")
+                or kwargs.get("start_id")
+                or kwargs.get("start_frame")
+                or kwargs.get("image_media_id")
+                or kwargs.get("first_frame")
+                or ""
+            )
+            if isinstance(start_id, str):
+                start_id = start_id.strip()
+
+            end_id = (
+                end_image_media_id
+                or kwargs.get("end_media_id")
+                or kwargs.get("end_scene_media_id")
+                or kwargs.get("end_id")
+                or kwargs.get("end_frame")
+                or kwargs.get("last_frame")
+                or None
+            )
+            if isinstance(end_id, str):
+                end_id = end_id.strip()
+                if not end_id:
+                    end_id = None
+
+            if end_id and (duration is None or duration == 4.0):
+                duration = 8.0
+
+            gen_type = "start_end_frame_2_video" if end_id else "frame_2_video"
 
             # ─── Flow batchexecute transport (Current path on flow.google.com) ───
             if USE_BATCH_RPC:
-                crop_list = get_batch_crop_list(aspect_ratio, crop_coordinates) if crop_coordinates else [None, None, 1, 1]
+                full_crop = getattr(fb, "FULL_FRAME_CROP", [None, 0.0038759689922481244, 1, 0.9961240310077519])
+                crop_list = get_batch_crop_list(aspect_ratio, crop_coordinates) if crop_coordinates else full_crop
                 pid = self._batch_project_id(project_id)
 
-                if end_image_media_id:
+                if end_id:
                     # 1. Frame-to-Frame interpolation (start + end) → nprQif
                     batch_model = vb.resolve_f2f_model(duration, user_paygate_tier)
                     logger.info(
                         "[VEO3 BATCH F2F DISPATCH] model=%s aspect=%s duration=%s start=%s end=%s",
                         batch_model, aspect_ratio, duration,
-                        start_image_media_id[:12], end_image_media_id[:12]
+                        start_id[:12], end_id[:12]
                     )
                     try:
                         freq = build_interpolation_request(
-                            prompt, pid, start_image_media_id, end_image_media_id,
+                            prompt, pid, start_id, end_id,
                             crop=crop_list, aspect=aspect_ratio, model=batch_model,
                             duration_s=duration, count=count,
                         )
@@ -316,14 +353,14 @@ def patch_flow_client():
                             RPC_GEN_INTERPOLATION, freq, fb.CAPTCHA_VIDEO, timeout=120
                         )
                         logger.info("[VEO3 NPRQIF RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
-                        if count > 1:
+                        try:
                             operations = vb.read_all_operations(payload)
-                        else:
+                        except Exception:
                             op = fb.read_operation(payload)
                             operations = [op] if op else []
                     except Exception as e:
                         return _batch_error(e)
-                elif start_image_media_id:
+                elif start_id:
                     # 2. Image-to-Video (start image only) → eb1hJf
                     batch_model = self._batch_video_model(user_paygate_tier, gen_type, aspect_ratio)
                     logger.info(
@@ -332,7 +369,7 @@ def patch_flow_client():
                     )
                     try:
                         freq = fb.video_request(
-                            prompt, pid, start_image_media_id, crop=crop_list, aspect=aspect_ratio,
+                            prompt, pid, start_id, crop=crop_list, aspect=aspect_ratio,
                             model=batch_model,
                         )
                         payload = await self._batch_payload(
@@ -361,9 +398,9 @@ def patch_flow_client():
                             vb.RPC_GEN_T2V, freq, fb.CAPTCHA_VIDEO, timeout=120
                         )
                         logger.info("[VEO3 T2V RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
-                        if count > 1:
+                        try:
                             operations = vb.read_all_operations(payload)
-                        else:
+                        except Exception:
                             op = fb.read_operation(payload)
                             operations = [op] if op else []
                     except Exception as e:
@@ -388,7 +425,7 @@ def patch_flow_client():
 
             logger.info(
                 "[VEO3 LEGACY REST DISPATCH] gen_type=%s model_key=%s duration=%s tier=%s end_frame=%s",
-                gen_type, model_key, duration, user_paygate_tier, bool(end_image_media_id)
+                gen_type, model_key, duration, user_paygate_tier, bool(end_id)
             )
 
             import time
@@ -401,13 +438,13 @@ def patch_flow_client():
                 "seed": int(time.time()) % 10000,
                 "textInput": {"structuredPrompt": {"parts": [{"text": prompt}]}},
                 "videoModelKey": model_key,
-                "startImage": {"mediaId": start_image_media_id, "cropCoordinates": crop_coords},
+                "startImage": {"mediaId": start_id, "cropCoordinates": crop_coords},
                 "metadata": {"sceneId": scene_id} if scene_id else {},
             }
-            if end_image_media_id:
-                request["endImage"] = {"mediaId": end_image_media_id, "cropCoordinates": crop_coords}
+            if end_id:
+                request["endImage"] = {"mediaId": end_id, "cropCoordinates": crop_coords}
 
-            endpoint_key = "generate_video_start_end" if end_image_media_id else "generate_video"
+            endpoint_key = "generate_video_start_end" if end_id else "generate_video"
             body = {
                 "mediaGenerationContext": {
                     "batchId": f"{uuid.uuid4()}",
@@ -467,9 +504,9 @@ def patch_flow_client():
                         RPC_GEN_VIDEO_REFS, freq, fb.CAPTCHA_VIDEO, timeout=120
                     )
                     logger.info("[VEO3 MZZa6b RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
-                    if count > 1:
+                    try:
                         operations = vb.read_all_operations(payload)
-                    else:
+                    except Exception:
                         op = fb.read_operation(payload)
                         operations = [op] if op else []
                     for op in operations:
@@ -486,6 +523,22 @@ def patch_flow_client():
 
         FlowClient.generate_video = enhanced_generate_video
         FlowClient.generate_video_from_references = enhanced_generate_video_from_references
+
+        orig_find_operation_media = FlowClient._find_operation_media
+
+        async def enhanced_find_operation_media(self, operation_id: str) -> tuple[str | None, str | None]:
+            # 1. Fast direct check: on Google Flow, completed video media ID matches operation ID!
+            try:
+                urls = await self._batch_media_urls(operation_id)
+                if urls and urls.video:
+                    logger.info("[VEO3 FAST MEDIA MATCH] operation_id=%s resolved to direct video URL", operation_id[:12])
+                    return operation_id, None
+            except Exception:
+                pass
+            # 2. Fallback to upstream lookup (polls jwpduf & project media listing)
+            return await orig_find_operation_media(self, operation_id)
+
+        FlowClient._find_operation_media = enhanced_find_operation_media
 
         # Add helper methods to FlowClient
         if not hasattr(FlowClient, "notify_request_status"):
@@ -752,6 +805,46 @@ def patch_worker_parsing():
         logger.error("Failed to patch worker parsing: %s", exc)
 
 
+def patch_operations():
+    """Patch OperationService.generate_scene_video to cleanly resolve both start and end frames."""
+    try:
+        from agent.sdk.services.operations import OperationService
+        orig_generate_scene_video = OperationService.generate_scene_video
+
+        async def enhanced_generate_scene_video(self, scene: dict, orientation: str, request_id: str = "") -> dict:
+            prefix = "vertical" if orientation == "VERTICAL" else "horizontal"
+            image_media_id = (
+                scene.get(f"{prefix}_image_media_id")
+                or scene.get(f"{prefix}_start_image_media_id")
+                or scene.get("start_image_media_id")
+                or scene.get("image_media_id")
+                or scene.get("start_media_id")
+            )
+            if not image_media_id:
+                return {"error": f"No {prefix} image media_id for scene"}
+            scene[f"{prefix}_image_media_id"] = image_media_id
+
+            end_id = (
+                scene.get(f"{prefix}_end_scene_media_id")
+                or scene.get(f"{prefix}_end_image_media_id")
+                or scene.get("end_image_media_id")
+                or scene.get("end_scene_media_id")
+                or scene.get("end_media_id")
+                or scene.get("end_frame")
+                or scene.get("end_id")
+            )
+            if end_id:
+                scene[f"{prefix}_end_scene_media_id"] = end_id
+                scene["end_image_media_id"] = end_id
+
+            return await orig_generate_scene_video(self, scene, orientation, request_id=request_id)
+
+        OperationService.generate_scene_video = enhanced_generate_scene_video
+        logger.info("Successfully patched OperationService.generate_scene_video with robust F2F end-frame resolution")
+    except Exception as exc:
+        logger.warning("Failed to patch OperationService: %s", exc)
+
+
 def patch_websocket_heartbeat(app):
     """Inject 15s ping heartbeat into WebSocket route to keep Chrome MV3 alive."""
     try:
@@ -820,6 +913,7 @@ def apply_all_patches(app=None):
     patch_db_and_crud()
     patch_flow_client()
     patch_worker_parsing()
+    patch_operations()
     if app is not None:
         patch_websocket_heartbeat(app)
         mount_extension_routes(app)

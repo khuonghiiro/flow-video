@@ -8,10 +8,10 @@ Houses endpoints for:
 """
 import asyncio
 import logging
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from agent.services.flow_client import get_flow_client
 from agent.services.skill_tree_pipeline import (
@@ -52,6 +52,47 @@ class EnhancedGenerateVideoRequest(BaseModel):
     count: int = 1
     title: Optional[str] = None
     display_name: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "projectId" in data and not data.get("project_id"):
+                data["project_id"] = data["projectId"]
+            # Map start frame aliases
+            start_val = (
+                data.get("start_image_media_id")
+                or data.get("start_media_id")
+                or data.get("start_id")
+                or data.get("start_frame")
+                or data.get("image_media_id")
+                or data.get("first_frame")
+                or ""
+            )
+            if isinstance(start_val, str):
+                data["start_image_media_id"] = start_val.strip()
+
+            # Map end frame aliases
+            end_val = (
+                data.get("end_image_media_id")
+                or data.get("end_media_id")
+                or data.get("end_id")
+                or data.get("end_frame")
+                or data.get("end_scene_media_id")
+                or data.get("last_frame")
+                or None
+            )
+            if isinstance(end_val, str):
+                end_val = end_val.strip()
+                data["end_image_media_id"] = end_val if end_val else None
+            else:
+                data["end_image_media_id"] = end_val
+
+            # When F2F is requested, default duration to 8s if not explicitly overridden
+            if data.get("end_image_media_id"):
+                if data.get("duration") is None and data.get("duration_s") in (None, 4):
+                    data["duration_s"] = 8
+        return data
 
 
 class EnhancedGenerateVideoRefsRequest(BaseModel):
@@ -148,6 +189,8 @@ async def generate_video_enhanced(body: EnhancedGenerateVideoRequest):
 
     body.project_id = await _get_or_detect_project_id(client, body.project_id)
     dur_s = int(body.duration) if body.duration is not None else body.duration_s
+    if body.end_image_media_id and (body.duration is None and dur_s == 4):
+        dur_s = 8
 
     if body.model_family == "omni_flash":
         from agent.services.omni_batch import generate_omni_flash_video

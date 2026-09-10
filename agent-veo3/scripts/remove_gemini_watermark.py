@@ -73,7 +73,7 @@ def detect_watermark_position(
     search_margin: int = 250
 ) -> tuple[int, int, float]:
     """
-    Tự động dò tìm tọa độ (x, y) của logo ở góc dưới bên phải bằng cross-correlation.
+    Tự động dò tìm tọa độ (x, y) của logo ở góc dưới bên phải bằng cross-correlation chuẩn hóa.
     Trả về: (best_x, best_y, confidence)
     """
     h, w = img.shape[:2]
@@ -84,10 +84,7 @@ def detect_watermark_position(
     search_roi = img[y0:h, x0:w]
     
     gray_roi = cv2.cvtColor(search_roi, cv2.COLOR_BGR2GRAY)
-    edges_roi = cv2.Canny(gray_roi, 25, 75)
-    edges_tpl = cv2.Canny(template, 40, 120)
-    
-    res = cv2.matchTemplate(edges_roi, edges_tpl, cv2.TM_CCORR)
+    res = cv2.matchTemplate(gray_roi, template, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, max_loc = cv2.minMaxLoc(res)
     
     found_x = x0 + max_loc[0]
@@ -96,17 +93,37 @@ def detect_watermark_position(
     return found_x, found_y, float(max_val)
 
 
+def load_calibrated_alpha(size: int = 48, asset_dir: Path | None = None) -> np.ndarray:
+    """Tải alpha map đã được hiệu chuẩn chính xác từ pixel thật của Google Imagen/Flow."""
+    if asset_dir is None:
+        asset_dir = get_default_asset_dir()
+    
+    npy_path = asset_dir / f"perfect_alpha_{size}.npy"
+    if npy_path.exists():
+        try:
+            return np.load(str(npy_path))
+        except Exception:
+            pass
+            
+    # Fallback template png
+    template = load_watermark_template(size, asset_dir)
+    return (template.astype(np.float64) / 255.0) * 0.314
+
+
 def remove_watermark(
     img: np.ndarray,
-    alpha_peak: float = 0.28,
+    alpha_peak: float = 0.295,
     target_size: int | None = None,
-    asset_dir: Path | None = None
+    asset_dir: Path | None = None,
+    aggressive: bool = False,
 ) -> np.ndarray:
     """
-    Khử watermark Gemini bằng thuật toán Reverse Alpha Blending.
-    Độ nét của pixel nền (sóng nước, vân bề mặt, chi tiết micro) được giữ nguyên vẹn 100%.
-    
-    Công thức: B = (I - alpha * 255) / (1 - alpha)
+    Khử watermark Gemini/Flow bảo tồn 100% chi tiết pixel gốc.
+    - Dùng thuật toán toán học chuẩn xác Reverse Alpha Blending:
+      B = clip((I - alpha * 255) / (1 - alpha), 0, 255)
+    - Loại bỏ hoàn toàn cơ chế Telea inpainting gây nhòe mờ loang lổ.
+    - aggressive=True: Bổ sung khử nhiễu lượng tử hóa cục bộ (Navier-Stokes)
+      CHỈ tại tâm lõi có alpha > 0.22 với bán kính tối thiểu r=2.
     """
     h, w = img.shape[:2]
     
@@ -115,37 +132,42 @@ def remove_watermark(
         target_size = 96 if max(h, w) >= 2048 else 48
         
     template = load_watermark_template(target_size, asset_dir)
+    alpha_map = load_calibrated_alpha(target_size, asset_dir)
+    
+    # Chuẩn hóa alpha_peak
+    if alpha_map.max() > 0:
+        alpha_norm = (alpha_map / alpha_map.max()) * alpha_peak
+    else:
+        alpha_norm = alpha_map
     
     # Tự động định vị watermark
     found_x, found_y, score = detect_watermark_position(img, template)
-    t_h, t_w = template.shape[:2]
+    t_h, t_w = alpha_norm.shape[:2]
     
-    # Kiểm tra bounds
+    # Kiểm tra bounds và fallback vị trí chuẩn (~73px từ góc phải dưới)
     x1, y1 = found_x, found_y
     x2, y2 = x1 + t_w, y1 + t_h
-    if x1 < 0 or y1 < 0 or x2 > w or y2 > h:
-        # Fallback vị trí tiêu chuẩn của Google Imagen: cách góc phải dưới ~73px
+    if x1 < 0 or y1 < 0 or x2 > w or y2 > h or score < 0.35:
         x1 = w - target_size - 73
         y1 = h - target_size - 73
         x2, y2 = x1 + t_w, y1 + t_h
+
+    # Phục hồi bằng Reverse Alpha Blending chính xác
+    patch = img[y1:y2, x1:x2].astype(np.float64)
+    a_3d = alpha_norm[:, :, np.newaxis]
+    denom = np.maximum(1.0 - a_3d, 1e-4)
+    restored = np.clip(np.round((patch - a_3d * 255.0) / denom), 0.0, 255.0).astype(np.uint8)
     
-    # Trích xuất vùng ảnh cần xử lý
-    patch = img[y1:y2, x1:x2].astype(np.float32)
-    
-    # Chuẩn hóa alpha map từ template (giá trị max trong template là 128 ứng với 100% hình dạng)
-    alpha_shape = (template.astype(np.float32) / 128.0)
-    alpha_map = alpha_shape * alpha_peak
-    alpha_map_3d = np.repeat(alpha_map[:, :, np.newaxis], 3, axis=2)
-    
-    # Đảo ngược alpha blending toán học: B = (I - alpha * W) / (1 - alpha)
-    # W = 255 (logo màu trắng của Gemini)
-    denom = np.maximum(1.0 - alpha_map_3d, 1e-4)
-    restored = (patch - alpha_map_3d * 255.0) / denom
-    restored = np.clip(restored, 0.0, 255.0).astype(np.uint8)
-    
-    # Gắn lại vào ảnh gốc
     result = img.copy()
     result[y1:y2, x1:x2] = restored
+
+    if aggressive:
+        # Chỉ xử lý nhẹ lượng tử hóa ở vùng lõi dày nhất, không làm mờ gờ đường nét xung quanh
+        core_mask = np.zeros((h, w), dtype=np.uint8)
+        core_mask[y1:y2, x1:x2] = (alpha_norm > 0.22).astype(np.uint8) * 255
+        cleaned = cv2.inpaint(result, core_mask, inpaintRadius=2, flags=cv2.INPAINT_NS)
+        return cleaned
+
     return result
 
 
