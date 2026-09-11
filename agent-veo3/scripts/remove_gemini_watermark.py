@@ -116,14 +116,14 @@ def remove_watermark(
     target_size: int | None = None,
     asset_dir: Path | None = None,
     aggressive: bool = False,
+    method: str = "rab",
 ) -> np.ndarray:
     """
     Khử watermark Gemini/Flow bảo tồn 100% chi tiết pixel gốc.
-    - Dùng thuật toán toán học chuẩn xác Reverse Alpha Blending:
+    - method="rab": Thuật toán Reverse Alpha Blending chuẩn xác:
       B = clip((I - alpha * 255) / (1 - alpha), 0, 255)
-    - Loại bỏ hoàn toàn cơ chế Telea inpainting gây nhòe mờ loang lổ.
-    - aggressive=True: Bổ sung khử nhiễu lượng tử hóa cục bộ (Navier-Stokes)
-      CHỈ tại tâm lõi có alpha > 0.22 với bán kính tối thiểu r=2.
+    - method="lama": Mạng nơ-ron LaMa Fourier Inpainting khử sạch 100% không để lại viền mờ.
+    - aggressive=True: Khử nhiễu lượng tử hóa Navier-Stokes nhẹ tại tâm lõi.
     """
     h, w = img.shape[:2]
     
@@ -132,27 +132,35 @@ def remove_watermark(
         target_size = 96 if max(h, w) >= 2048 else 48
         
     template = load_watermark_template(target_size, asset_dir)
-    alpha_map = load_calibrated_alpha(target_size, asset_dir)
     
-    # Chuẩn hóa alpha_peak
+    # Tự động định vị watermark
+    found_x, found_y, score = detect_watermark_position(img, template)
+    
+    # Kiểm tra bounds và fallback vị trí chuẩn (~73px từ góc phải dưới)
+    x1, y1 = found_x, found_y
+    if x1 < 0 or y1 < 0 or x1 + target_size > w or y1 + target_size > h or score < 0.35:
+        x1 = w - target_size - 73
+        y1 = h - target_size - 73
+
+    # Chế độ AI LaMa Inpainting
+    if method.lower() == "lama":
+        try:
+            from lama_inpaint import get_lama_inpainter
+            inpainter = get_lama_inpainter()
+            return inpainter.remove_watermark(img, x1, y1, size=target_size, tpl=template)
+        except Exception as e:
+            print(f"[WARN] LaMa inpainting thất bại ({e}), fallback về Reverse Alpha Blending.")
+
+    # Chế độ Reverse Alpha Blending toán học
+    alpha_map = load_calibrated_alpha(target_size, asset_dir)
     if alpha_map.max() > 0:
         alpha_norm = (alpha_map / alpha_map.max()) * alpha_peak
     else:
         alpha_norm = alpha_map
     
-    # Tự động định vị watermark
-    found_x, found_y, score = detect_watermark_position(img, template)
     t_h, t_w = alpha_norm.shape[:2]
-    
-    # Kiểm tra bounds và fallback vị trí chuẩn (~73px từ góc phải dưới)
-    x1, y1 = found_x, found_y
     x2, y2 = x1 + t_w, y1 + t_h
-    if x1 < 0 or y1 < 0 or x2 > w or y2 > h or score < 0.35:
-        x1 = w - target_size - 73
-        y1 = h - target_size - 73
-        x2, y2 = x1 + t_w, y1 + t_h
 
-    # Phục hồi bằng Reverse Alpha Blending chính xác
     patch = img[y1:y2, x1:x2].astype(np.float64)
     a_3d = alpha_norm[:, :, np.newaxis]
     denom = np.maximum(1.0 - a_3d, 1e-4)
@@ -162,7 +170,6 @@ def remove_watermark(
     result[y1:y2, x1:x2] = restored
 
     if aggressive:
-        # Chỉ xử lý nhẹ lượng tử hóa ở vùng lõi dày nhất, không làm mờ gờ đường nét xung quanh
         core_mask = np.zeros((h, w), dtype=np.uint8)
         core_mask[y1:y2, x1:x2] = (alpha_norm > 0.22).astype(np.uint8) * 255
         cleaned = cv2.inpaint(result, core_mask, inpaintRadius=2, flags=cv2.INPAINT_NS)
@@ -174,7 +181,8 @@ def remove_watermark(
 def process_file(
     input_path: str | Path,
     output_path: str | Path | None = None,
-    alpha_peak: float = 0.28
+    alpha_peak: float = 0.28,
+    method: str = "rab"
 ) -> bool:
     """Xử lý một file ảnh đơn lẻ."""
     in_p = Path(input_path)
@@ -187,7 +195,7 @@ def process_file(
         print(f"[ERROR] Không thể đọc ảnh: {in_p}")
         return False
         
-    cleaned = remove_watermark(img, alpha_peak=alpha_peak)
+    cleaned = remove_watermark(img, alpha_peak=alpha_peak, method=method)
     
     if output_path is None:
         if in_p.parent.name == "watermarks":
@@ -205,7 +213,7 @@ def process_file(
     else:
         cv2.imwrite(str(out_p), cleaned)
         
-    print(f"[SUCCESS] Đã khử logo thành công -> {out_p}")
+    print(f"[SUCCESS] Đã khử logo thành công ({method.upper()}) -> {out_p}")
     return True
 
 
@@ -221,7 +229,20 @@ def main():
         default=0.28,
         help="Độ mờ alpha của watermark (mặc định: 0.28)"
     )
+    parser.add_argument(
+        "-m", "--method",
+        choices=["rab", "lama"],
+        default="rab",
+        help="Phương pháp khử watermark: 'rab' (Reverse Alpha Blending, siêu tốc) hoặc 'lama' (AI Inpainting, chất lượng hoàn hảo)"
+    )
+    parser.add_argument(
+        "--lama",
+        action="store_true",
+        help="Sử dụng model AI LaMa để khử logo (viết tắt cho --method lama)"
+    )
     args = parser.parse_args()
+    
+    chosen_method = "lama" if args.lama else args.method
     
     # Mặc định quét agent-veo3/output/watermarks nếu không truyền tham số
     if args.input is None:
@@ -235,18 +256,18 @@ def main():
         in_path = Path(args.input)
         
     if in_path.is_file():
-        process_file(in_path, args.output, alpha_peak=args.alpha)
+        process_file(in_path, args.output, alpha_peak=args.alpha, method=chosen_method)
     elif in_path.is_dir():
         image_exts = {".jpg", ".jpeg", ".png", ".webp"}
         files = [f for f in in_path.iterdir() if f.suffix.lower() in image_exts and "_cleaned" not in f.name]
-        print(f"Tìm thấy {len(files)} ảnh trong thư mục {in_path}...")
+        print(f"Tìm thấy {len(files)} ảnh trong thư mục {in_path} (Phương pháp: {chosen_method.upper()})...")
         for f in files:
             out_file = None
             if args.output:
                 out_file = Path(args.output) / f.name
             elif in_path.name == "watermarks":
                 out_file = in_path.parent / "cleaned" / f.name
-            process_file(f, out_file, alpha_peak=args.alpha)
+            process_file(f, out_file, alpha_peak=args.alpha, method=chosen_method)
     else:
         print(f"[ERROR] Đường dẫn không hợp lệ: {in_path}")
         sys.exit(1)

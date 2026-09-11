@@ -2,11 +2,12 @@
 
 Remove the semi-transparent 4-pointed sparkle watermark from Gemini/Imagen generated images using the lossless Reverse Alpha Blending mathematical engine.
 
-Usage: `/fk-unwatermark <image_or_dir_path> [--output <output_path>] [--alpha 0.28]`
+Usage: `/fk-unwatermark <image_or_dir_path> [--output <output_path>] [--alpha 0.28] [--lama]`
 
 - `image_or_dir_path` — path to single image or directory containing images
 - `--output` / `-o` — optional target output file or directory
 - `--alpha` / `-a` — watermark opacity (default: `0.28`, tuned for Gemini / Imagen 3)
+- `--lama` / `-m lama` — use LaMa AI inpainting engine (flawless reconstruction on challenging backgrounds)
 
 ---
 

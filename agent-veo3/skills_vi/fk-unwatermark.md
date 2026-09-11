@@ -2,11 +2,12 @@
 
 Kỹ năng tự động phát hiện và khử sạch logo watermark hình ngôi sao 4 cánh ở góc phải bên dưới do Google Gemini / Imagen / Google Flow tạo ra, sử dụng thuật toán toán học **Reverse Alpha Blending** mà vẫn giữ nguyên 100% độ sắc nét pixel, vân chi tiết và chất lượng gốc.
 
-Usage: `/fk-unwatermark <đường_dẫn_ảnh_hoặc_thư_mục> [--output <đường_dẫn_xuất>] [--alpha 0.28]`
+Usage: `/fk-unwatermark <đường_dẫn_ảnh_hoặc_thư_mục> [--output <đường_dẫn_xuất>] [--alpha 0.28] [--lama]`
 
 - `<đường_dẫn_ảnh_hoặc_thư_mục>` — File ảnh đơn lẻ hoặc thư mục chứa nhiều ảnh cần làm sạch
 - `--output` / `-o` — Tùy chọn đường dẫn file hoặc thư mục đích
 - `--alpha` / `-a` — Độ mờ của watermark (mặc định: `0.28`, chuẩn cho Gemini / Imagen 3)
+- `--lama` / `-m lama` — Sử dụng mô hình AI LaMa Inpainting (xóa sạch 100% cả trên nền tối và bầu trời)
 
 ---
 

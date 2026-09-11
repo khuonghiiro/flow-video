@@ -7,6 +7,7 @@ __pycache__/
 .env
 .venv
 logs/
+models/
 # Output directory: ignore media files, but keep metadata for AI and project tracking
 output/**
 !output/**/
