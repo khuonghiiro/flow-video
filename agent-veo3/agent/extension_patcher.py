@@ -179,6 +179,22 @@ def patch_flow_client():
         ) -> str:
             start_id = start_media_id or start_image_media_id or kwargs.get("start_frame") or kwargs.get("start_id") or ""
             end_id = end_media_id or end_image_media_id or kwargs.get("end_frame") or kwargs.get("end_scene_media_id") or kwargs.get("end_id") or ""
+            
+            # If only start_id is provided without end_id, this is "Tạo video với ảnh" (R2V via MZZa6b), NOT F2F
+            if not end_id and start_id:
+                logger.warning(
+                    "[F2F -> R2V AUTO ROUTE] Interpolation called without end_frame (start=%s). Routing to MZZa6b (Tạo video với ảnh)",
+                    start_id[:12]
+                )
+                return build_r2v_request(
+                    prompt=prompt,
+                    project_id=project_id,
+                    reference_media_ids=[start_id],
+                    aspect=aspect,
+                    model=resolve_r2v_model(model),
+                    count=count,
+                )
+
             full_crop = getattr(fb, "FULL_FRAME_CROP", [None, 0.0038759689922481244, 1, 0.9961240310077519])
             crop_val = full_crop if (crop is None or crop == [None, None, 1, 1]) else crop
             asp_val = fb.resolve_video_aspect(aspect or "VIDEO_ASPECT_RATIO_LANDSCAPE") if hasattr(fb, "resolve_video_aspect") else 2
@@ -194,7 +210,7 @@ def patch_flow_client():
                     [None, end_id, None, None, None, crop_val],
                     [None, None, None, None, fb._client_uuid(), fb._client_uuid()],
                 ])
-            inner = [items, fb._context(project_id), [fb._client_uuid(), 2]]
+            inner = [items, fb._context(project_id), [fb._client_uuid(), 1]]
             return fb.build_envelope(RPC_GEN_INTERPOLATION, inner)
 
         # Ensure flow_batch has interpolation capabilities exposed
@@ -253,6 +269,23 @@ def patch_flow_client():
         fb.r2v_request = build_r2v_request
         fb.resolve_r2v_model = resolve_r2v_model
 
+        def patched_video_request(prompt: str, project_id: str, source_media_id: str,
+                                  crop: Optional[list] = None,
+                                  aspect: Any = "VIDEO_ASPECT_LANDSCAPE",
+                                  model: str = "veo_3_1_r2v_lite_low_priority",
+                                  **kwargs) -> str:
+            """Redirect legacy video_request to Flow UI's real MZZa6b (Tạo video với ảnh)."""
+            return build_r2v_request(
+                prompt=prompt,
+                project_id=project_id,
+                reference_media_ids=[source_media_id] if source_media_id else [],
+                aspect=aspect,
+                model=resolve_r2v_model(model),
+                count=kwargs.get("count", 1),
+            )
+
+        fb.video_request = patched_video_request
+
         orig_read_operation = fb.read_operation
 
         def enhanced_read_operation(payload: Any) -> fb.Operation:
@@ -270,11 +303,24 @@ def patch_flow_client():
             record = records[0] if isinstance(records, list) and records else None
             if not isinstance(record, list) or not record:
                 raise fb.FlowBatchError("operation payload carried no record")
+
+            op_id = record[0]
+            proj_id = record[1] if len(record) > 1 else None
+            status = record[3] if len(record) > 3 and isinstance(record[3], str) else None
+
+            # Check if this is a node record: [node_id, null, null, [title, ts, null, null, op_id, ...], proj_id]
+            detail = record[3] if len(record) > 3 else None
+            if isinstance(detail, list) and len(detail) > 4 and isinstance(detail[4], str) and detail[4]:
+                op_id = detail[4]
+                status = "MEDIA_GENERATION_STATUS_PENDING"
+                if len(record) > 4 and isinstance(record[4], str):
+                    proj_id = record[4]
+
             return fb.Operation(
-                operation_id=record[0],
-                project_id=record[1] if len(record) > 1 else None,
-                status=record[3] if len(record) > 3 and isinstance(record[3], str) else None,
-                error=fb.read_operation_error(record),
+                operation_id=op_id,
+                project_id=proj_id,
+                status=status,
+                error=fb.read_operation_error(record) if len(record) > 5 else None,
             )
 
         fb.read_operation = enhanced_read_operation
@@ -361,24 +407,48 @@ def patch_flow_client():
                     except Exception as e:
                         return _batch_error(e)
                 elif start_id:
-                    # 2. Image-to-Video (start image only) → eb1hJf
-                    batch_model = self._batch_video_model(user_paygate_tier, gen_type, aspect_ratio)
+                    # 2. Tạo video với ảnh (1-3 tham chiếu ảnh) → MZZa6b (chuẩn Flow UI trong logs/tạo video với ảnh - dọc.txt)
+                    r2v_model = resolve_r2v_model(
+                        "veo_3_1_r2v_fast_ultra" if "ultra" in str(user_paygate_tier).lower()
+                        else "veo_3_1_r2v_lite_low_priority"
+                    )
                     logger.info(
-                        "[VEO3 BATCH I2V DISPATCH] gen_type=%s model=%s aspect=%s duration=%s",
-                        gen_type, batch_model, aspect_ratio, duration
+                        "[VEO3 BATCH R2V DISPATCH] RPC=MZZa6b model=%s aspect=%s start_id=%s count=%d",
+                        r2v_model, aspect_ratio, start_id[:12], count
                     )
                     try:
-                        freq = fb.video_request(
-                            prompt, pid, start_id, crop=crop_list, aspect=aspect_ratio,
-                            model=batch_model,
+                        freq = build_r2v_request(
+                            prompt=prompt,
+                            project_id=pid,
+                            reference_media_ids=[start_id],
+                            aspect=aspect_ratio,
+                            model=r2v_model,
+                            count=count,
                         )
                         payload = await self._batch_payload(
-                            fb.RPC_GEN_VIDEO, freq, fb.CAPTCHA_VIDEO, timeout=120
+                            RPC_GEN_VIDEO_REFS, freq, fb.CAPTCHA_VIDEO, timeout=120
                         )
-                        op = fb.read_operation(payload)
-                        operations = [op] if op else []
+                        logger.info("[VEO3 MZZa6b RAW PAYLOAD] %s", json.dumps(payload, ensure_ascii=False)[:3000])
+                        try:
+                            operations = vb.read_all_operations(payload)
+                        except Exception:
+                            op = fb.read_operation(payload)
+                            operations = [op] if op else []
                     except Exception as e:
-                        return _batch_error(e)
+                        logger.warning("MZZa6b dispatch failed (%s), attempting eb1hJf legacy fallback", e)
+                        try:
+                            batch_model = self._batch_video_model(user_paygate_tier, gen_type, aspect_ratio)
+                            freq = fb.video_request(
+                                prompt, pid, start_id, crop=crop_list, aspect=aspect_ratio,
+                                model=batch_model,
+                            )
+                            payload = await self._batch_payload(
+                                fb.RPC_GEN_VIDEO, freq, fb.CAPTCHA_VIDEO, timeout=120
+                            )
+                            op = fb.read_operation(payload)
+                            operations = [op] if op else []
+                        except Exception as e2:
+                            return _batch_error(e)
                 else:
                     # 3. Text-to-Video (0 images) → YhhmEf
                     t2v_model = vb.resolve_t2v_model(duration)

@@ -69,9 +69,9 @@ Print: "All videos ready. Run /fk-concat <VID> to download and merge."
 
 For **manual/direct** video generation outside the batch worker, use these endpoints:
 
-### T2V (Text-to-Video) — 0 images, prompt only
+### T2V (Text-to-Video) — 0 ảnh, chỉ prompt
 ```bash
-curl -X POST http://127.0.0.1:8100/flow/generate-video \
+curl -X POST http://127.0.0.1:8100/api/flow/generate-video \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A sunset over the ocean, cinematic 4K",
@@ -82,54 +82,56 @@ curl -X POST http://127.0.0.1:8100/flow/generate-video \
     "count": 2
   }'
 ```
-- RPC: `YhhmEf` | Duration: 4s, 6s, 8s | Count: 1-4
+- RPC: `YhhmEf` | Model: `veo_3_1_t2v_lite_low_priority` | Duration: 4s, 6s, 8s | Count: 1-4
 
-### I2V (Image-to-Video) — 1 start image
+### I2V / R2V (Tạo video với ảnh) — 1 đến 3 ảnh tham chiếu
+> 💡 Google Flow chuẩn: Không có cơ chế frame đơn lẻ trong F2F. Mọi yêu cầu tạo video từ 1-3 ảnh đều dùng RPC `MZZa6b`.
 ```bash
-curl -X POST http://127.0.0.1:8100/flow/generate-video \
+curl -X POST http://127.0.0.1:8100/api/flow/generate-video \
   -H "Content-Type: application/json" \
   -d '{
     "start_image_media_id": "<MEDIA_ID>",
-    "prompt": "Character walks forward",
+    "prompt": "Cinematic slow camera glide forward, glowing particles",
     "project_id": "<PID>",
     "aspect_ratio": "VIDEO_ASPECT_RATIO_PORTRAIT",
     "duration_s": 8,
     "model_family": "veo",
-    "count": 1
+    "count": 2
   }'
 ```
-- RPC: `eb1hJf` | Duration: 8s | Count: 1
+- RPC: `MZZa6b` | Model: `veo_3_1_r2v_lite_low_priority` | Duration: **8s cố định** (chế độ tạo video với ảnh chỉ hỗ trợ 8s) | Tối đa 3 ảnh tham chiếu | Count: 1-4
 
-### F2F (Frame-to-Frame) — start + end images
+### F2F (Tạo video từ Frame to Frame) — BẮT BUỘC ĐỦ 2 FRAME (Start + End)
+> ⚠️ Cảnh báo: F2F bắt buộc phải có đồng thời cả Start Frame và End Frame. Nếu chỉ truyền 1 frame, hệ thống tự động điều hướng sang R2V `MZZa6b`.
 ```bash
-curl -X POST http://127.0.0.1:8100/flow/generate-video \
+curl -X POST http://127.0.0.1:8100/api/flow/generate-video \
   -H "Content-Type: application/json" \
   -d '{
     "start_image_media_id": "<START_MEDIA_ID>",
     "end_image_media_id": "<END_MEDIA_ID>",
-    "prompt": "Character transitions from sitting to standing",
+    "prompt": "Character transitions smoothly from sitting to standing",
     "project_id": "<PID>",
-    "aspect_ratio": "VIDEO_ASPECT_RATIO_LANDSCAPE",
-    "duration_s": 6,
+    "aspect_ratio": "VIDEO_ASPECT_RATIO_PORTRAIT",
+    "duration_s": 8,
     "model_family": "veo",
     "count": 2
   }'
 ```
-- RPC: `nprQif` | Duration: 4s, 6s, 8s | Count: 1-4
+- RPC: `nprQif` | Model: `veo_3_1_interpolation_lite_low_priority` | Duration: 4s, 6s, 8s (mặc định 8s) | Count: 1-4
 
-### R2V (Reference-to-Video) — 1-3 reference images
+### R2V trực tiếp (Reference-to-Video) — 1 đến 3 ảnh tham chiếu
 ```bash
-curl -X POST http://127.0.0.1:8100/flow/generate-video-refs \
+curl -X POST http://127.0.0.1:8100/api/flow/generate-video-refs \
   -H "Content-Type: application/json" \
   -d '{
     "reference_media_ids": ["<REF_ID_1>", "<REF_ID_2>"],
-    "prompt": "A character walking through a garden",
+    "prompt": "A character walking through a glowing garden",
     "project_id": "<PID>",
     "aspect_ratio": "VIDEO_ASPECT_RATIO_PORTRAIT",
     "count": 2
   }'
 ```
-- RPC: `MZZa6b` | Duration: 8s only | Max 3 refs | Count: 1-4
+- RPC: `MZZa6b` | Model: `veo_3_1_r2v_lite_low_priority` | Duration: 8s cố định | Max 3 refs | Count: 1-4
 
 ## Important rules
 
